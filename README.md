@@ -1,3 +1,9 @@
+# Kennely 2027.15 – Vollständiges Projekt
+
+**Updateanleitung: [UPDATE_2027_15.md](UPDATE_2027_15.md)**
+
+Versionsänderung: Einheitliche Username-Eingabe bei Registrierung und Profiländerung.
+
 # Kennely Social 2027.14 – vollständiges Netlify-Projekt
 
 **Neu:** [UPDATE_2027_13.md](UPDATE_2027_13.md). Privates Konto und Profilidentität direkt sichtbar, unabhängig von fehlerhaften Nebenabfragen.
