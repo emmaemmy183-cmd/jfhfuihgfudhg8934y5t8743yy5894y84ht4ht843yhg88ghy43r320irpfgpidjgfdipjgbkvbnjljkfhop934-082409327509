@@ -53,14 +53,14 @@ async function requireUser(req, env) {
 }
 function safeUser(row) {
   return {
-    official:!!row.official, id:row.id, email:row.email, username:row.username, emailVerified:!!row.email_verified_at, name:row.display_name, age:yearsOld(row.birth_date),
+    official:!!row.official, id:row.id, email:row.email, username:row.username, emailVerified:!!row.email_verified_at, name:row.display_name||row.username, age:yearsOld(row.birth_date),
     city:row.city, gender:row.gender, lookingFor:row.looking_for, intent:row.intent,
     bio:row.bio, interests:JSON.parse(row.interests || '[]'), photoId:row.photoId||null, visible:!!row.visible, isPrivate:!!row.is_private, suspended:!!row.is_banned,
     admin:!!row.role, role:row.role||null,
   };
 }
 function profile(row) {
-  return { id:row.id, username:row.username||null, name:row.display_name, age:yearsOld(row.birth_date), city:row.city,
+  return { id:row.id, username:row.username||null, name:row.display_name||row.username, age:yearsOld(row.birth_date), city:row.city,
     gender:row.gender, intent:row.intent, bio:row.bio,
     interests:JSON.parse(row.interests||'[]'), photoId:row.photo_id || null, staffRole:row.staff_role||null, official:!!row.official, isPrivate:!!row.is_private, labels:row.labels||[] };
 }
@@ -117,7 +117,7 @@ function pathId(path, prefix) { return decodeURIComponent(path.slice(prefix.leng
 async function api(req, env) {
   noCrossOriginWrite(req);
   const url = new URL(req.url), path=url.pathname, method=req.method;
-  if (method==='GET' && path==='/api/health') return json({ ok:true, project:'Kennely', version:'2027.social.11', mailReady: mailConfigured(env), publicReady: String(env.REGISTRATION_MODE||'')==='public' && mailConfigured(env) && Boolean(env.PUBLIC_ORIGIN) });
+  if (method==='GET' && path==='/api/health') return json({ ok:true, project:'Kennely', version:'2027.social.3', mailReady: mailConfigured(env), publicReady: String(env.REGISTRATION_MODE||'')==='public' && mailConfigured(env) && Boolean(env.PUBLIC_ORIGIN) });
   if (method==='GET' && path==='/api/auth/username') {
     const username=String(url.searchParams.get('name')||'').trim().toLowerCase();
     const reason=await usernamePolicyFor(env,username);
@@ -176,7 +176,7 @@ async function api(req, env) {
     if(password.length<10||password.length>128)error(400,'Passwort muss mindestens 10 Zeichen enthalten.');
     // Der Anzeigename ist optional; ein fehlender Anzeigename wird als Nutzername angezeigt.
     if(!isAdult(d.birthDate)||d.adult!==true||d.terms!==true)error(400,'Kennely ist ab 16 Jahren.');
-    if(!['frau','mann','divers'].includes(d.gender))error(400,'Bitte Geschlecht auswählen.');
+    if(!['frau','mann','divers','nichtbinaer','sonstiges','keine_angabe'].includes(d.gender))error(400,'Bitte Geschlecht auswählen.');
     if(await one(env,'SELECT 1 AS e FROM users WHERE email=?',[email]))error(409,'Ein Konto mit dieser E-Mail besteht bereits.');
     if(await one(env,'SELECT 1 AS e FROM users WHERE username=? COLLATE NOCASE',[username]))error(409,'Nutzername existiert schon.');
     const id=crypto.randomUUID(),pw=await passwordHash(password);
@@ -184,7 +184,7 @@ async function api(req, env) {
       await main(env,'INSERT INTO users(id,email,username,password_hash,password_salt,password_iterations,email_verified_at) VALUES(?,?,?,?,?,?,?)',
         [id,email,username,pw.hash,pw.salt,pw.iterations,local&&mode==='local'?new Date().toISOString():null]);
       await main(env,'INSERT INTO profiles(user_id,display_name,birth_date,city,gender) VALUES(?,?,?,?,?)',
-        [id,name||username,d.birthDate,clean(d.city,64),d.gender]);
+        [id,name,d.birthDate,clean(d.city,64),d.gender]);
     }catch(e){await main(env,'DELETE FROM users WHERE id=?',[id]).catch(()=>{});throw e;}
     if(mode==='public'){
       const secret=randomToken();
@@ -280,7 +280,7 @@ async function api(req, env) {
       (SELECT ph.id FROM photos ph WHERE ph.user_id=u.id AND ph.status='approved' ORDER BY ph.created_at DESC LIMIT 1) AS photo_id
       FROM users u JOIN profiles p ON p.user_id=u.id
       WHERE u.id<>? AND u.is_banned=0 AND p.visible=1 AND date(p.birth_date)<=date('now','-16 years')
-      AND u.username LIKE ? ESCAPE '\\'
+      AND p.discoverable=1 AND u.username LIKE ? ESCAPE '\\'
       AND NOT EXISTS(SELECT 1 FROM blocks b WHERE (b.blocker_id=? AND b.blocked_id=u.id) OR (b.blocked_id=? AND b.blocker_id=u.id))
       ORDER BY CASE WHEN lower(u.username)=? THEN 0 ELSE 1 END, lower(u.username) ASC LIMIT 25`,
       [user.id, escaped+'%',user.id,user.id,query])).rows;
@@ -300,12 +300,12 @@ async function api(req, env) {
   }
   if (method==='PATCH' && path==='/api/profile') {
     const d=await bodyLimited(req);
-    const name=clean(d.name,32)||user.username, bio=clean(d.bio,650), city=clean(d.city,64);
+    const bio=clean(d.bio,650), city=clean(d.city,64);
     const gender=clean(d.gender,16), looking=clean(d.lookingFor,16),intent=clean(d.intent,32);
     const interests=[...new Set(Array.isArray(d.interests)?d.interests.map(x=>clean(x,24)).filter(Boolean):[])].slice(0,8);
-    if (!['frau','mann','divers'].includes(gender) || !['alle','frauen','maenner','divers'].includes(looking) || !['offen','beziehung','dating','freundschaft'].includes(intent)) error(400,'Profilangaben überprüfen.');
-    await main(env,`UPDATE profiles SET display_name=?,bio=?,city=?,gender=?,looking_for=?,intent=?,interests=?,visible=?,updated_at=CURRENT_TIMESTAMP WHERE user_id=?`,
-      [name,bio,city,gender,looking,intent,JSON.stringify(interests),d.visible===false?0:1,user.id]);
+    if (!['frau','mann','divers','nichtbinaer','sonstiges','keine_angabe'].includes(gender) || !['alle','frauen','maenner','divers'].includes(looking) || !['offen','beziehung','dating','freundschaft'].includes(intent)) error(400,'Profilangaben überprüfen.');
+    await main(env,`UPDATE profiles SET bio=?,city=?,gender=?,looking_for=?,intent=?,interests=?,visible=?,updated_at=CURRENT_TIMESTAMP WHERE user_id=?`,
+      [bio,city,gender,looking,intent,JSON.stringify(interests),d.visible===false?0:1,user.id]);
     return json({ok:true});
   }
   if (method==='GET' && path==='/api/discover') {
@@ -318,7 +318,7 @@ async function api(req, env) {
         AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id=? AND b.blocked_id=u.id) OR (b.blocked_id=? AND b.blocker_id=u.id))
         AND NOT EXISTS (SELECT 1 FROM likes l WHERE l.from_user=? AND l.to_user=u.id)
         AND NOT EXISTS (SELECT 1 FROM skips sk WHERE sk.from_user=? AND sk.to_user=u.id AND sk.created_at>datetime('now','-30 days'))
-        AND (?='alle' OR (?='frauen' AND p.gender='frau') OR (?='maenner' AND p.gender='mann') OR (?='divers' AND p.gender='divers'))
+        AND (?='alle' OR (?='frauen' AND p.gender='frau') OR (?='maenner' AND p.gender='mann') OR (?='divers' AND p.gender IN ('divers','nichtbinaer','sonstiges')))
         AND (p.looking_for='alle' OR (p.looking_for='frauen' AND ?='frau') OR (p.looking_for='maenner' AND ?='mann') OR (p.looking_for='divers' AND ?='divers'))
       ORDER BY (CASE WHEN lower(p.city)=lower(?) AND p.city<>'' THEN 4 ELSE 0 END + CASE WHEN p.intent=? THEN 2 ELSE 0 END) DESC,p.updated_at DESC LIMIT ? OFFSET ?`,[user.id,user.id,user.id,user.id,user.id,user.looking_for,user.looking_for,user.looking_for,user.looking_for,user.gender,user.gender,user.gender,user.city,user.intent,limit,offset])).rows;
     return json({profiles:rows.map(profile),hasMore:rows.length===limit});
@@ -524,12 +524,14 @@ async function api(req, env) {
     // Videoobjekte getrennt vom SQL-Speicher löschen.
     for(const item of await main(env,"SELECT id FROM social_media WHERE user_id=? AND mime LIKE 'video/%'",[user.id]).then(r=>r.rows))await env.MEDIA_BUCKET?.delete(item.id).catch(()=>{});
     const socialCleanup=[
+      ['DELETE FROM social_dm_reactions WHERE user_id=? OR message_id IN (SELECT id FROM social_dms WHERE sender_id=? OR thread_id IN (SELECT id FROM social_threads WHERE user_a=? OR user_b=?))',[user.id,user.id,user.id,user.id]],
       ['DELETE FROM social_dms WHERE thread_id IN (SELECT id FROM social_threads WHERE user_a=? OR user_b=?)',[user.id,user.id]],
       ['DELETE FROM social_dms WHERE sender_id=?',[user.id]],
       ['DELETE FROM social_threads WHERE user_a=? OR user_b=?',[user.id,user.id]],
       ['DELETE FROM social_post_likes WHERE user_id=? OR post_id IN (SELECT id FROM social_posts WHERE user_id=?)',[user.id,user.id]],
       ['DELETE FROM social_post_saves WHERE user_id=? OR post_id IN (SELECT id FROM social_posts WHERE user_id=?)',[user.id,user.id]],
-      ['DELETE FROM social_comments WHERE user_id=? OR post_id IN (SELECT id FROM social_posts WHERE user_id=?)',[user.id,user.id]],
+      ['DELETE FROM social_comment_likes WHERE user_id=? OR comment_id IN (SELECT id FROM social_comments WHERE user_id=? OR post_id IN (SELECT id FROM social_posts WHERE user_id=?))',[user.id,user.id,user.id]],
+
       ['DELETE FROM social_follow_requests WHERE follower_id=? OR following_id=?',[user.id,user.id]],
       ['DELETE FROM social_story_likes WHERE user_id=? OR story_id IN (SELECT id FROM social_stories WHERE user_id=?)',[user.id,user.id]],
       ['DELETE FROM profile_labels WHERE user_id=?',[user.id]],

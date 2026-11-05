@@ -40,6 +40,12 @@ const staff=async(env,user,cap='media.review')=>{if(!await allowed(env,user,cap)
 export async function socialRoutes(req,env,user){const url=new URL(req.url),path=url.pathname,method=req.method;
  if(!path.startsWith('/api/social/'))return null;
  const offset=Math.max(0,Math.min(100000,Number(url.searchParams.get('offset'))||0));
+ if(method==='GET'&&/^\/api\/social\/posts\/[a-f\d-]{36}$/i.test(path)){
+   const id=idGuard(path.split('/')[4]);await postVisible(env,id,user.id);
+   const args=[user.id,user.id,user.id,user.id,user.id,user.id,id];
+   const record=await one(env,feedSQL('sp.id=?')+' LIMIT 1',args);
+   if(!record)err(404,'Beitrag nicht verfügbar');return output({post:record});
+ }
  if(method==='GET'&&['/api/social/feed','/api/social/explore','/api/social/official','/api/social/saved','/api/social/liked'].includes(path)){
   let filter='(sp.visibility=\'public\' OR sp.user_id=? OR EXISTS(SELECT 1 FROM social_follows sf WHERE sf.follower_id=? AND sf.following_id=sp.user_id))';let tail=[];
   if(path==='/api/social/liked') filter+=' AND EXISTS(SELECT 1 FROM social_post_likes pl WHERE pl.user_id=? AND pl.post_id=sp.id)';
@@ -159,6 +165,26 @@ export async function socialRoutes(req,env,user){const url=new URL(req.url),path
   await main(env,'INSERT INTO content_reviews(id,content_type,content_id,user_id,status,reason) VALUES(?,?,?,?,?,?)',[uid(),'story',id,user.id,auto?'approved':'pending',policy.review?'Automatischer Prüfhinweis (mehrsprachige Wortliste).':'' ]);
   return output({ok:true,id,pendingReview:!auto,expiresInHours:24},201);
  }
+ if(method==='GET'&&/^\/api\/social\/profiles\/[a-f\d-]{36}\/(followers|following)$/i.test(path)){
+  const [,id,kind]=path.match(/^\/api\/social\/profiles\/([a-f\d-]{36})\/(followers|following)$/i);
+  const person=await target(env,id);if(await blocked(env,user.id,id))err(404,'Profil nicht verfügbar');
+  if(id!==user.id){
+    const policy=await one(env,'SELECT follow_visibility AS visibility FROM profiles WHERE user_id=?',[id]);
+    const isFollower=!!await one(env,'SELECT 1 AS n FROM social_follows WHERE follower_id=? AND following_id=?',[user.id,id]);
+    if(policy?.visibility==='only_me'||(policy?.visibility==='followers'&&!isFollower)||person.isPrivate&&!isFollower)
+      err(403,'Diese Liste ist privat.');
+  }
+  const predicate=kind==='followers'?'f.following_id=?':'f.follower_id=?';
+  const match=kind==='followers'?'f.follower_id':'f.following_id';
+  const people=(await main(env,`SELECT u.id,u.username,p.display_name AS name,
+    (SELECT 1 FROM official_accounts o WHERE o.user_id=u.id) AS official,
+    (SELECT ph.id FROM photos ph WHERE ph.user_id=u.id AND ph.status='approved' ORDER BY ph.created_at DESC LIMIT 1) AS photoId
+    FROM social_follows f JOIN users u ON u.id=${match} JOIN profiles p ON p.user_id=u.id
+    WHERE ${predicate} AND u.is_banned=0 AND p.visible=1 AND NOT EXISTS(SELECT 1 FROM blocks b
+    WHERE (b.blocker_id=? AND b.blocked_id=u.id) OR (b.blocked_id=? AND b.blocker_id=u.id))
+    ORDER BY f.created_at DESC LIMIT 100`,[id,user.id,user.id])).rows;
+  return output({people,kind});
+ }
  if(method==='GET'&&path.startsWith('/api/social/profiles/')){
   const id=idGuard(path.slice('/api/social/profiles/'.length)),p=await target(env,id);
   if(await blocked(env,user.id,id))err(404,'Profile unavailable');
@@ -205,20 +231,47 @@ export async function socialRoutes(req,env,user){const url=new URL(req.url),path
   if(action==='like'&&p.user_id!==user.id){await notify(env,p.user_id,'like','Neues Like',`${user.username||'Jemand'} gefällt dein Beitrag`,user.id);await pushLive(env,[p.user_id],'notification');}
   return output({active:true});
  }
+ if(method==='POST'&&/^\/api\/social\/comments\/[a-f\d-]{36}\/like$/i.test(path)){
+  const id=path.split('/')[4];const c=await one(env,"SELECT c.post_id AS postId FROM social_comments c WHERE c.id=? AND c.status='published' AND EXISTS(SELECT 1 FROM content_reviews cr WHERE cr.content_type='comment' AND cr.content_id=c.id AND cr.status='approved')",[id]);
+  if(!c)err(404,'Kommentar nicht gefunden');await postVisible(env,c.postId,user.id);
+  const existing=await one(env,'SELECT 1 AS n FROM social_comment_likes WHERE comment_id=? AND user_id=?',[id,user.id]);
+  if(existing){await main(env,'DELETE FROM social_comment_likes WHERE comment_id=? AND user_id=?',[id,user.id]);return output({liked:false});}
+  await main(env,'INSERT OR IGNORE INTO social_comment_likes(comment_id,user_id) VALUES(?,?)',[id,user.id]);return output({liked:true});
+ }
+ if(method==='DELETE'&&/^\/api\/social\/comments\/[a-f\d-]{36}$/i.test(path)){
+  const id=path.split('/')[4],comment=await one(env,'SELECT c.id,c.user_id AS author,p.user_id AS creator,c.post_id AS postId FROM social_comments c JOIN social_posts p ON p.id=c.post_id WHERE c.id=?',[id]);
+  if(!comment)err(404,'Kommentar nicht gefunden');
+  if(![comment.author,comment.creator].includes(user.id)&&!await allowed(env,user,'reports.review'))err(403,'Keine Berechtigung.');
+  await postVisible(env,comment.postId,user.id);
+  await main(env,"UPDATE social_comments SET status='removed' WHERE id=?",[id]);
+  if(user.id!==comment.author)await audit(env,user.id,'comment_removed',id,'Beitragsinhaber oder Moderation');
+  return output({ok:true});
+ }
  if(method==='GET'&&/^\/api\/social\/posts\/[a-f\d-]{36}\/comments$/i.test(path)){
   const id=path.split('/')[4];await postVisible(env,id,user.id);
-  const rows=(await main(env,`SELECT c.id,c.user_id AS userId,c.body,c.created_at AS createdAt,u.username,p.display_name AS name,
-  (SELECT role FROM team_members t WHERE t.user_id=u.id) AS role,(SELECT 1 FROM official_accounts oa WHERE oa.user_id=u.id) AS official
-  FROM social_comments c JOIN users u ON u.id=c.user_id JOIN profiles p ON p.user_id=u.id WHERE c.post_id=? AND c.status='published' AND EXISTS(SELECT 1 FROM content_reviews cr WHERE cr.content_type='comment' AND cr.content_id=c.id AND cr.status='approved') AND u.is_banned=0 ORDER BY c.created_at ASC LIMIT 100`,[id])).rows;
+  const rows=(await main(env,`SELECT c.id,c.user_id AS userId,c.body,c.parent_id AS parentId,c.created_at AS createdAt,u.username,p.display_name AS name,
+  (SELECT role FROM team_members t WHERE t.user_id=u.id) AS role,(SELECT 1 FROM official_accounts oa WHERE oa.user_id=u.id) AS official,
+  (SELECT ph.id FROM photos ph WHERE ph.user_id=u.id AND ph.status='approved' ORDER BY ph.created_at DESC LIMIT 1) AS photoId,
+  (SELECT COUNT(*) FROM social_comment_likes l WHERE l.comment_id=c.id) AS likes,
+  (SELECT 1 FROM social_comment_likes l WHERE l.comment_id=c.id AND l.user_id=?) AS liked
+  FROM social_comments c JOIN users u ON u.id=c.user_id JOIN profiles p ON p.user_id=u.id WHERE c.post_id=? AND c.status='published' AND EXISTS(SELECT 1 FROM content_reviews cr WHERE cr.content_type='comment' AND cr.content_id=c.id AND cr.status='approved') AND u.is_banned=0 ORDER BY c.created_at ASC LIMIT 100`,[user.id,id])).rows;
   return output({comments:rows});
  }
  if(method==='POST'&&/^\/api\/social\/posts\/[a-f\d-]{36}\/comments$/i.test(path)){
   const id=path.split('/')[4],p=await postVisible(env,id,user.id),d=await body(req),txt=clean(d.body,500);
-  if(!txt)err(400,'Comment is empty');const recent=await one(env,"SELECT COUNT(*) AS n FROM social_comments WHERE user_id=? AND created_at>datetime('now','-1 minute')",[user.id]);if(Number(recent.n)>=12)err(429,'Slow down');
-  const cid=uid(),policy=await policyFor(env,txt),auto=roleLevel(user.role)>=2&&!policy.review;await main(env,'INSERT INTO social_comments(id,post_id,user_id,body) VALUES(?,?,?,?)',[cid,id,user.id,txt]);
+  if(!txt)err(400,'Comment is empty');
+  if(p.user_id!==user.id){
+    const pref=await one(env,'SELECT comment_policy AS policy FROM profiles WHERE user_id=?',[p.user_id]);
+    if(pref?.policy==='nobody')err(403,'Diese Person hat Kommentare deaktiviert.');
+    if(pref?.policy==='followers'&&!await one(env,'SELECT 1 AS n FROM social_follows WHERE follower_id=? AND following_id=?',[user.id,p.user_id]))err(403,'Nur Follower dürfen kommentieren.');
+  }
+  const recent=await one(env,"SELECT COUNT(*) AS n FROM social_comments WHERE user_id=? AND created_at>datetime('now','-1 minute')",[user.id]);if(Number(recent.n)>=12)err(429,'Slow down');
+  const parentId=d.parentId? idGuard(d.parentId):null;
+  if(parentId){const parent=await one(env,"SELECT id FROM social_comments WHERE id=? AND post_id=? AND status='published'",[parentId,id]);if(!parent)err(400,'Antwortziel nicht verfügbar.');}
+  const cid=uid(),policy=await policyFor(env,txt),auto=roleLevel(user.role)>=2&&!policy.review;await main(env,'INSERT INTO social_comments(id,post_id,user_id,body,parent_id) VALUES(?,?,?,?,?)',[cid,id,user.id,txt,parentId]);
   await main(env,'INSERT INTO content_reviews(id,content_type,content_id,user_id,status,reason) VALUES(?,?,?,?,?,?)',[uid(),'comment',cid,user.id,auto?'approved':'pending',policy.review?'Automatischer Prüfhinweis (mehrsprachige Wortliste).':'']);
   // Benachrichtigung erst nach Moderationsfreigabe des Kommentars.
-  return output({ok:true},201);
+  return output({ok:true,pendingReview:!auto},201);
  }
  if(method==='DELETE'&&/^\/api\/social\/posts\/[a-f\d-]{36}$/i.test(path)){
   const id=path.split('/')[4],p=await one(env,'SELECT user_id FROM social_posts WHERE id=?',[id]);if(!p)err(404,'No post');if(p.user_id!==user.id&&roleLevel(user.role)<2)err(403,'Not permitted');
@@ -263,6 +316,10 @@ export async function socialRoutes(req,env,user){const url=new URL(req.url),path
  if(method==='POST'&&path==='/api/social/dm/open'){
   await checkFeature(env,user.id,'chat');const d=await body(req),other=idGuard(d.userId);
   if(other===user.id)err(400,'Choose another user');await target(env,other);if(await blocked(env,user.id,other))err(403,'Blocked');
+  const policy=await one(env,'SELECT message_policy AS preference FROM profiles WHERE user_id=?',[other]);
+  const following=await one(env,'SELECT 1 AS n FROM social_follows WHERE follower_id=? AND following_id=?',[other,user.id]);
+  const staffOverride=!!user.role;
+  if(!staffOverride&&(policy?.preference==='nobody'||policy?.preference==='followers'&&!following))err(403,'Diese Person akzeptiert derzeit keine Nachrichtenanfragen.');
   const [a,b]=[user.id,other].sort(),id=`${a}:${b}`;
   const isMutual=await one(env,`SELECT 1 AS mutual FROM social_follows f1 JOIN social_follows f2 ON f2.follower_id=f1.following_id AND f2.following_id=f1.follower_id WHERE f1.follower_id=? AND f1.following_id=?`,[user.id,other]);
   await main(env,"INSERT OR IGNORE INTO social_threads(id,user_a,user_b,initiator_id,status) VALUES(?,?,?,?,?)",[id,a,b,user.id,isMutual?'accepted':'pending']);return output({id});
@@ -272,7 +329,24 @@ export async function socialRoutes(req,env,user){const url=new URL(req.url),path
   const other=thread.user_a===user.id?thread.user_b:thread.user_a;
   const rows=(await main(env,'SELECT id,sender_id AS senderId,body,created_at AS createdAt,read_at AS readAt FROM social_dms WHERE thread_id=? ORDER BY created_at DESC LIMIT 100',[id])).rows;
   if(rows.some(m=>m.senderId!==user.id&&!m.readAt))await main(env,'UPDATE social_dms SET read_at=CURRENT_TIMESTAMP WHERE thread_id=? AND sender_id<>? AND read_at IS NULL',[id,user.id]);
-  return output({thread,messages:rows.reverse(),blocked:await blocked(env,user.id,other)});
+  const reactions=(await main(env,`SELECT r.message_id AS messageId,r.user_id AS userId,r.emoji
+    FROM social_dm_reactions r JOIN social_dms m ON m.id=r.message_id WHERE m.thread_id=? ORDER BY m.created_at DESC LIMIT 160`,[id])).rows;
+  const reactionMap=new Map();for(const r of reactions){if(!reactionMap.has(r.messageId))reactionMap.set(r.messageId,[]);reactionMap.get(r.messageId).push({userId:r.userId,emoji:r.emoji});}
+  return output({thread,messages:rows.reverse().map(m=>({...m,reactions:reactionMap.get(m.id)||[]})),blocked:await blocked(env,user.id,other)});
+ }
+ if(/^\/api\/social\/dm\/[^/]+\/messages\/[a-f\d-]{36}\/react$/i.test(path)&&method==='POST'){
+  const threadId=decodeURIComponent(path.split('/')[4]),msgId=path.split('/')[6];
+  const t=await one(env,'SELECT user_a,user_b FROM social_threads WHERE id=? AND (user_a=? OR user_b=?)',[threadId,user.id,user.id]);
+  if(!t)err(404,'Unterhaltung nicht gefunden');
+  const other=t.user_a===user.id?t.user_b:t.user_a;
+  if(await blocked(env,user.id,other))err(403,'Nicht erlaubt.');
+  const msg=await one(env,'SELECT id FROM social_dms WHERE id=? AND thread_id=?',[msgId,threadId]);if(!msg)err(404,'Nachricht nicht gefunden.');
+  const d=await body(req),emoji=String(d.emoji||'');
+  if(!['❤️','😂','😮','😢','👍','🔥','🥰','👏'].includes(emoji))err(400,'Ungültige Reaktion.');
+  const existing=await one(env,'SELECT emoji FROM social_dm_reactions WHERE message_id=? AND user_id=?',[msgId,user.id]);
+  if(existing?.emoji===emoji){await main(env,'DELETE FROM social_dm_reactions WHERE message_id=? AND user_id=?',[msgId,user.id]);return output({emoji:null});}
+  await main(env,'INSERT INTO social_dm_reactions(message_id,user_id,emoji) VALUES(?,?,?) ON CONFLICT(message_id,user_id) DO UPDATE SET emoji=excluded.emoji',[msgId,user.id,emoji]);
+  return output({emoji});
  }
  if(/^\/api\/social\/dm\/[^/]+\/hide$/.test(path)&&method==='POST'){
   const id=decodeURIComponent(path.split('/')[4]);const thread=await one(env,'SELECT 1 AS ok FROM social_threads WHERE id=? AND (user_a=? OR user_b=?)',[id,user.id,user.id]);
@@ -419,9 +493,12 @@ export async function socialRoutes(req,env,user){const url=new URL(req.url),path
 export async function pruneSocial(env){
  const expired=(await main(env,"SELECT id,media_id FROM social_stories WHERE expires_at<CURRENT_TIMESTAMP ORDER BY expires_at ASC LIMIT 18")).rows;
  for(const s of expired){
+   await main(env,'DELETE FROM social_story_likes WHERE story_id=?',[s.id]);
    await main(env,'DELETE FROM social_stories WHERE id=?',[s.id]);
    if(s.media_id){const m=await one(env,'SELECT mime FROM social_media WHERE id=?',[s.media_id]);if(m?.mime?.startsWith('video/'))await env.MEDIA_BUCKET?.delete(s.media_id).catch(()=>{});else await media(env,'DELETE FROM media WHERE id=?',[s.media_id]);await main(env,'DELETE FROM social_media WHERE id=?',[s.media_id]);}
  }
+ // Limited expiry cleanup reduces notification storage without touching active moderation evidence.
+ await main(env,"DELETE FROM notifications WHERE read_at IS NOT NULL AND created_at<datetime('now','-120 days') AND id IN (SELECT id FROM notifications WHERE read_at IS NOT NULL ORDER BY created_at ASC LIMIT 80)");
  const orphaned=(await main(env,"SELECT m.id FROM social_media m WHERE m.status='pending' AND m.created_at<datetime('now','-30 days') AND NOT EXISTS(SELECT 1 FROM social_posts p WHERE p.media_id=m.id) AND NOT EXISTS(SELECT 1 FROM social_stories s WHERE s.media_id=m.id) LIMIT 12")).rows;
  for(const m of orphaned){const x=await one(env,'SELECT mime FROM social_media WHERE id=?',[m.id]);if(x?.mime?.startsWith('video/'))await env.MEDIA_BUCKET?.delete(m.id).catch(()=>{});else await media(env,'DELETE FROM media WHERE id=?',[m.id]);await main(env,'DELETE FROM social_media WHERE id=?',[m.id]);}
  return {expired:expired.length,unusedMedia:orphaned.length};

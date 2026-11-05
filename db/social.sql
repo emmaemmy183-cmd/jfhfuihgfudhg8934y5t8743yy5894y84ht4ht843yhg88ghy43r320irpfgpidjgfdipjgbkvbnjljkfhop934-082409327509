@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS social_post_saves (
 );
 CREATE TABLE IF NOT EXISTS social_comments (
  id TEXT PRIMARY KEY, post_id TEXT NOT NULL REFERENCES social_posts(id), user_id TEXT NOT NULL REFERENCES users(id),
- body TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'published' CHECK(status IN ('published','removed')),
+ body TEXT NOT NULL, parent_id TEXT, status TEXT NOT NULL DEFAULT 'published' CHECK(status IN ('published','removed')),
  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_social_comments_post ON social_comments(post_id,created_at);

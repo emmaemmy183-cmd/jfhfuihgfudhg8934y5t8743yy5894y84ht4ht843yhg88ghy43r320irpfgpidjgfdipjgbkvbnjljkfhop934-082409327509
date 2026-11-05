@@ -1,9 +1,9 @@
 {
   "name": "kennely",
-  "version": "2027.11.0",
+  "version": "2027.12.0",
   "private": true,
   "type": "module",
-  "description": "Kennely Social DE ab 16: Netlify Functions, Turso, responsive Teamverwaltung, Fotos, Stories, Chats",
+  "description": "Kennely Social DE ab 16: Netlify Functions, Turso, Fotos, Stories und Nachrichten",
   "scripts": {
     "dev": "node --env-file=.dev.vars server/node-server.mjs",
     "deploy": "echo GitHub-verbundene Netlify-Site aktualisiert sich nach git push origin main",
@@ -12,15 +12,19 @@
     "test": "node --test tests/*.test.mjs",
     "owner:assign": "node --env-file=.dev.vars scripts/assign-owner.mjs",
     "official:assign": "node --env-file=.dev.vars scripts/assign-official.mjs",
-    "check:js": "node --check netlify/functions/api.mjs && node --check netlify/edge-functions/country-gate.js && node --check public/social-app.js && node --check src/server/index.js",
+    "check:js": "node --check netlify/functions/api.mjs && node --check netlify/edge-functions/country-gate.js && node --check public/social-app.js && node --check src/server/index.js && node --check src/server/social.js && node --check src/server/controls.js && node --check src/server/features.js",
     "db:schema": "node --env-file=.dev.vars scripts/check-schema.mjs",
     "start": "node server/node-server.mjs",
     "user:delete": "node --env-file=.dev.vars scripts/delete-user.mjs",
     "dev:node": "node --env-file=.dev.vars server/node-server.mjs",
     "deploy:prod": "echo GitHub-verbundene Netlify-Site aktualisiert sich nach git push origin main",
-    "check:netlify": "node --test tests/netlify-adapter.test.mjs"
+    "check:netlify": "node --test tests/netlify-adapter.test.mjs",
+    "policy:count": "node scripts/count-terms.mjs"
   },
   "engines": {
     "node": ">=20.10.0"
+  },
+  "dependencies": {
+    "naughty-words": "1.2.0"
   }
 }

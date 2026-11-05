@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS users (
   password_iterations INTEGER NOT NULL,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   last_login_at TEXT,
+  username_changed_at TEXT,
   is_admin INTEGER NOT NULL DEFAULT 0,
   is_banned INTEGER NOT NULL DEFAULT 0,
   email_verified_at TEXT
@@ -31,6 +32,11 @@ CREATE TABLE IF NOT EXISTS profiles (
   interests TEXT NOT NULL DEFAULT '[]',
   visible INTEGER NOT NULL DEFAULT 1,
   is_private INTEGER NOT NULL DEFAULT 0,
+  display_name_changed_at TEXT,
+  message_policy TEXT NOT NULL DEFAULT 'everyone',
+  follow_visibility TEXT NOT NULL DEFAULT 'everyone',
+  comment_policy TEXT NOT NULL DEFAULT 'everyone',
+  discoverable INTEGER NOT NULL DEFAULT 1,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_profiles_name ON profiles(display_name COLLATE NOCASE);

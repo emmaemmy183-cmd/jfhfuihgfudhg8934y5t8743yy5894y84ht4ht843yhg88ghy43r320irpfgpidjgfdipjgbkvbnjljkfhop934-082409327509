@@ -127,7 +127,9 @@ export async function features(req,env,user){const url=new URL(req.url),p=url.pa
   // Prefix matching avoids expensive full substring searches; only operational metadata is returned.
   const prefix=query.replace(/[/%_]/g,c=>'/'+c)+'%';
   const rows=(await main(env,`SELECT u.id,u.username,p.display_name AS name,u.is_banned AS banned,t.role,
-     u.created_at AS createdAt,u.email_verified_at AS emailVerifiedAt
+     u.created_at AS createdAt,u.email_verified_at AS emailVerifiedAt,
+      (SELECT 1 FROM official_accounts oa WHERE oa.user_id=u.id) AS official,
+      (SELECT ph.id FROM photos ph WHERE ph.user_id=u.id AND ph.status='approved' ORDER BY ph.created_at DESC LIMIT 1) AS photoId
      FROM users u JOIN profiles p ON u.id=p.user_id LEFT JOIN team_members t ON t.user_id=u.id
      WHERE u.username LIKE ? ESCAPE '/' OR u.email LIKE ? ESCAPE '/' OR p.display_name LIKE ? ESCAPE '/'
      ORDER BY u.created_at DESC LIMIT 25`,[prefix,prefix,prefix])).rows;
@@ -158,7 +160,12 @@ export async function features(req,env,user){const url=new URL(req.url),p=url.pa
   await audit(env,user.id,'team_change',target,String(d.role));return json({ok:true});
  }
  if(m==='GET'&&p==='/api/admin/audit'){
-  requireStaff(user,'admin');const rows=(await main(env,'SELECT * FROM admin_audit ORDER BY created_at DESC LIMIT 100')).rows;return json({audit:rows});
+  if(!await allowed(env,user,'audit.view'))fail(403,'Keine Berechtigung.');const rows=(await main(env,`SELECT a.id,a.action,a.target_id AS targetId,a.details,a.created_at AS createdAt,
+    u.username AS actorUsername,p.display_name AS actorName,
+    (SELECT 1 FROM official_accounts o WHERE o.user_id=a.actor_id) AS official,
+    (SELECT ph.id FROM photos ph WHERE ph.user_id=a.actor_id AND ph.status='approved' ORDER BY ph.created_at DESC LIMIT 1) AS photoId
+    FROM admin_audit a LEFT JOIN users u ON u.id=a.actor_id LEFT JOIN profiles p ON p.user_id=a.actor_id
+    ORDER BY a.created_at DESC LIMIT 75`)).rows;return json({audit:rows});
  }
  if(m==='POST'&&p==='/api/admin/moderate'){
   requireStaff(user,'moderator');const d=await data(req),target=guardId(d.userId),action=String(d.action||''),reason=clean(d.reason,500);

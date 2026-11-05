@@ -12,7 +12,7 @@ async function parse(req){if(!req.headers.get('content-type')?.startsWith('appli
 async function log(env,actor,action,target,details=''){await main(env,'INSERT INTO admin_audit(id,actor_id,action,target_id,details) VALUES(?,?,?,?,?)',[uid(),actor,action,target,details]);}
 const CAPS={
  'user.inspect':3,'identity.edit':3,'badge.manage':3,'account.suspend':4,'account.delete':5,
- 'team.manage':5,'permissions.manage':5,'terms.manage':4,'labels.manage':5,'media.review':2,'reports.review':2
+ 'team.manage':5,'permissions.manage':5,'terms.manage':4,'labels.manage':5,'labels.self':1,'audit.view':4,'media.review':2,'reports.review':2
 };
 export const CAPABILITIES=Object.freeze(Object.keys(CAPS));
 export async function allowed(env,user,cap){
@@ -27,10 +27,12 @@ export async function allowed(env,user,cap){
 async function need(env,u,cap){if(!await allowed(env,u,cap))throwHttp(403,'Du hast keine Berechtigung für diese Aktion.');}
 function idGuard(id){if(!idOk(id))throwHttp(400,'Ungültiges Konto.');return id;}
 export async function policyFor(env,text){
+ if(env.REGISTRATION_MODE==='public'&&DEFAULT_TERMS.length<3000)throwHttp(503,'Der mehrsprachige Wortfilter ist noch nicht vollständig eingerichtet.');
  const records=(await main(env,'SELECT term,action FROM moderation_terms ORDER BY term LIMIT 750')).rows;
  return evaluateText(text,records.filter(r=>r.action==='review').map(r=>r.term),records.filter(r=>r.action==='allow').map(r=>r.term));
 }
 export async function usernamePolicyFor(env,value){
+ if(env.REGISTRATION_MODE==='public'&&DEFAULT_TERMS.length<3000)throwHttp(503,'Der mehrsprachige Wortfilter ist noch nicht vollständig eingerichtet.');
  const records=(await main(env,'SELECT term,action FROM moderation_terms ORDER BY term LIMIT 750')).rows;
  return usernameReason(value,records.filter(r=>r.action==='review').map(r=>r.term),records.filter(r=>r.action==='allow').map(r=>r.term));
 }
@@ -78,6 +80,52 @@ export async function controls(req,env,user){
   }
   return out({ok:true,isPrivate:d.isPrivate});
  }
+ if(method==='GET'&&path==='/api/account/identity'){
+  const record=await one(env,`SELECT u.username,u.username_changed_at AS usernameChangedAt,
+    p.display_name AS name,p.display_name_changed_at AS nameChangedAt
+    FROM users u JOIN profiles p ON p.user_id=u.id WHERE u.id=?`,[user.id]);
+  return out({identity:record});
+ }
+ if(method==='PATCH'&&path==='/api/account/identity'){
+  const d=await parse(req);
+  if(d.username===undefined&&d.name===undefined)throwHttp(400,'Keine Änderungen angegeben.');
+  if(d.username!==undefined){
+   const username=String(d.username||'').trim().toLowerCase();
+   const reason=await usernamePolicyFor(env,username);if(reason)throwHttp(400,reason);
+   const current=await one(env,'SELECT username FROM users WHERE id=?',[user.id]);
+   if(username!==current.username){
+    const found=await one(env,'SELECT id FROM users WHERE username=? COLLATE NOCASE AND id<>?',[username,user.id]);if(found)throwHttp(409,'Nutzername bereits vergeben.');
+    const result=await main(env,`UPDATE users SET username=?,username_changed_at=CURRENT_TIMESTAMP WHERE id=?
+       AND (username_changed_at IS NULL OR username_changed_at<=datetime('now','-30 days'))`,[username,user.id]);
+    if(result.count===0)throwHttp(429,'Nutzername kann nur alle 30 Tage geändert werden.');
+   }
+  }
+  if(d.name!==undefined){
+   const name=clean(d.name,32);
+   const current=await one(env,'SELECT display_name FROM profiles WHERE user_id=?',[user.id]);
+   // Keep the visible fallback to username, but allow an empty optional display name.
+   if(name!==String(current?.display_name||'')){
+    const result=await main(env,`UPDATE profiles SET display_name=?,display_name_changed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
+      WHERE user_id=? AND (display_name_changed_at IS NULL OR display_name_changed_at<=datetime('now','-7 days'))`,[name,user.id]);
+    if(result.count===0)throwHttp(429,'Anzeigename kann nur alle 7 Tage geändert werden.');
+   }
+  }
+  return out({ok:true});
+ }
+ if(method==='GET'&&path==='/api/account/privacy/preferences'){
+  const p=await one(env,'SELECT is_private AS isPrivate,message_policy AS messagePolicy,follow_visibility AS followVisibility, comment_policy AS commentPolicy, discoverable FROM profiles WHERE user_id=?',[user.id]);
+  return out({privacy:{isPrivate:!!p?.isPrivate,messagePolicy:p?.messagePolicy||'everyone',followVisibility:p?.followVisibility||'everyone',commentPolicy:p?.commentPolicy||'everyone',discoverable:p?.discoverable!==0}});
+ }
+ if(method==='PATCH'&&path==='/api/account/privacy/preferences'){
+  const d=await parse(req),updates=[],args=[];
+  if(d.isPrivate!==undefined){if(typeof d.isPrivate!=='boolean')throwHttp(400,'Ungültige Einstellung.');updates.push('is_private=?');args.push(d.isPrivate?1:0);}
+  if(d.messagePolicy!==undefined){if(!['everyone','followers','nobody'].includes(d.messagePolicy))throwHttp(400,'Ungültige Chat-Einstellung.');updates.push('message_policy=?');args.push(d.messagePolicy);}
+  if(d.followVisibility!==undefined){if(!['everyone','followers','only_me'].includes(d.followVisibility))throwHttp(400,'Ungültige Follower-Einstellung.');updates.push('follow_visibility=?');args.push(d.followVisibility);}
+  if(d.commentPolicy!==undefined){if(!['everyone','followers','nobody'].includes(d.commentPolicy))throwHttp(400,'Ungültige Kommentar-Einstellung.');updates.push('comment_policy=?');args.push(d.commentPolicy);}
+  if(d.discoverable!==undefined){if(typeof d.discoverable!=='boolean')throwHttp(400,'Ungültige Sichtbarkeit.');updates.push('discoverable=?');args.push(d.discoverable?1:0);}
+  if(!updates.length)throwHttp(400,'Keine Änderungen.');
+  await main(env,`UPDATE profiles SET ${updates.join(',')},updated_at=CURRENT_TIMESTAMP WHERE user_id=?`,[...args,user.id]);return out({ok:true});
+ }
  if(!path.startsWith('/api/admin/'))return null;
  if(method==='GET'&&path==='/api/admin/permissions'){
   await need(env,user,'permissions.manage');
@@ -101,7 +149,7 @@ export async function controls(req,env,user){
  if(method==='GET'&&path==='/api/admin/terms'){
   await need(env,user,'terms.manage');
   const overrides=(await main(env,'SELECT term,action,language,updated_at AS updatedAt FROM moderation_terms ORDER BY updated_at DESC LIMIT 200')).rows;
-  return out({defaults:DEFAULT_TERMS,overrides});
+  return out({defaults:DEFAULT_TERMS.slice(0,120),defaultCount:DEFAULT_TERMS.length,overrides});
  }
  if(method==='POST'&&path==='/api/admin/terms'){
   await need(env,user,'terms.manage');const d=await parse(req),term=clean(d.term,56).toLowerCase(),action=String(d.action);
@@ -112,15 +160,16 @@ export async function controls(req,env,user){
  }
  if(method==='POST'&&path==='/api/admin/identity'){
   const d=await parse(req),target=idGuard(d.userId),username=d.username===undefined?null:String(d.username||'').trim().toLowerCase();
+  if(target===user.id)throwHttp(400,'Eigenes Profil bitte über die Kontoeinstellungen ändern.');
   await need(env,user,'identity.edit');
   const role=(await one(env,'SELECT role FROM team_members WHERE user_id=?',[target]))?.role;
-  if(level({role})>=level(user))throwHttp(403,'Teamidentitäten dieser Rolle können nicht geändert werden.');
+  if(target!==user.id&&level({role})>=level(user))throwHttp(403,'Teamidentitäten dieser Rolle können nicht geändert werden.');
   const update=[];const args=[];
   if(username!==null){const invalid=await usernamePolicyFor(env,username);if(invalid)throwHttp(400,invalid);
    if(await one(env,'SELECT 1 AS n FROM users WHERE username=? COLLATE NOCASE AND id<>?',[username,target]))throwHttp(409,'Nutzername bereits vergeben.');
    update.push('username=?');args.push(username);
   }
-  if(d.name!==undefined){const name=clean(d.name,32);await main(env,'UPDATE profiles SET display_name=?,updated_at=CURRENT_TIMESTAMP WHERE user_id=?',[name||username||(await one(env,'SELECT username FROM users WHERE id=?',[target]))?.username,target]);}
+  if(d.name!==undefined){const name=clean(d.name,32);await main(env,'UPDATE profiles SET display_name=?,updated_at=CURRENT_TIMESTAMP WHERE user_id=?',[name,target]);}
   if(update.length)await main(env,`UPDATE users SET ${update.join(',')} WHERE id=?`,[...args,target]);
   await log(env,user.id,'identity_updated',target,`Username geändert: ${username!==null}; Anzeigename geändert: ${d.name!==undefined}`);return out({ok:true});
  }
@@ -132,8 +181,10 @@ export async function controls(req,env,user){
   await log(env,user.id,'badge_verified',target,verified?'verifiziert':'entfernt');return out({ok:true});
  }
  if(method==='POST'&&path==='/api/admin/labels'){
-  await need(env,user,'labels.manage');const d=await parse(req),target=idGuard(d.userId),label=clean(d.label,26),color=String(d.color||'purple');
+  const d=await parse(req),target=idGuard(d.userId),label=clean(d.label,26),color=String(d.color||'purple');
+  await need(env,user,target===user.id?'labels.self':'labels.manage');
   if(!label||!['purple','blue','green','gold','gray'].includes(color)||!['add','remove'].includes(d.action))throwHttp(400,'Ungültiges Label.');
+  if(target===user.id&&/\b(ceo|owner|admin|administrator|verifiziert|verified|offiziell|moderator|manager)\b/i.test(label))throwHttp(403,'Offizielle Rollen und Kennzeichnungen vergibt ausschließlich die Teamleitung.');
   if(d.action==='remove')await main(env,'DELETE FROM profile_labels WHERE user_id=? AND label=?',[target,label]);
   else{const n=await one(env,'SELECT COUNT(*) AS n FROM profile_labels WHERE user_id=?',[target]);if(Number(n?.n)>=5)throwHttp(400,'Maximal fünf Labels je Konto.');await main(env,'INSERT OR REPLACE INTO profile_labels(user_id,label,color,granted_by) VALUES(?,?,?,?)',[target,label,color,user.id]);}
   await log(env,user.id,'label_'+d.action,target,label);return out({ok:true});
