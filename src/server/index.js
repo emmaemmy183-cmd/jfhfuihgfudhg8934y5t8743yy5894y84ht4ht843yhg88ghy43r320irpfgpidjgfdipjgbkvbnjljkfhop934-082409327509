@@ -114,7 +114,15 @@ function pathId(path, prefix) { return decodeURIComponent(path.slice(prefix.leng
 async function api(req, env) {
   noCrossOriginWrite(req);
   const url = new URL(req.url), path=url.pathname, method=req.method;
-  if (method==='GET' && path==='/api/health') return json({ ok:true, project:'Kennely', version:'2027.social.1', mailReady: mailConfigured(env), publicReady:false });
+ if (method==='GET' && path==='/api/health') return json({
+  ok: true,
+  project: 'Kennely',
+  version: '2027.social.1',
+  mailReady: mailConfigured(env),
+  publicReady: env.REGISTRATION_MODE === 'public' &&
+               mailConfigured(env) &&
+               env.MAIL_FROM === 'no-support@kennely.de'
+});
   if (method==='GET' && path==='/api/auth/username') {
     const username=String(url.searchParams.get('name')||'').trim().toLowerCase();
     if(!/^[a-z][a-z0-9._]{4,23}$/.test(username)) return json({available:false,valid:false,reason:'Mindestens 5 Zeichen, beginnt mit einem Buchstaben. Nur a-z, 0-9, Punkt und Unterstrich.'});
