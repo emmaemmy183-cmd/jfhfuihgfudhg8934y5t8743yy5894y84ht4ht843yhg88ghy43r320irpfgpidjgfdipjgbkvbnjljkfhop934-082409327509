@@ -1,0 +1,19 @@
+# Copy to .dev.vars. NEVER commit this file or paste real secrets into chat.
+TURSO_MAIN_URL="libsql://MAIN-DB.turso.io"
+TURSO_MAIN_TOKEN="REPLACE_WITH_ROTATED_MAIN_TOKEN"
+TURSO_MEDIA_URL="libsql://MEDIA-DB.turso.io"
+TURSO_MEDIA_TOKEN="REPLACE_WITH_ROTATED_MEDIA_TOKEN"
+IP_HASH_SECRET="GENERATE_32_RANDOM_BYTES"
+PUBLIC_ORIGIN="http://127.0.0.1:8787"
+COUNTRY_LOCK="DE"
+LEGACY_DATING_ENABLED="false"
+# local: test registrations, email verification bypassed ONLY on localhost
+# public: anyone may register; transactional email must be configured and verified
+REGISTRATION_MODE="local"
+# Password reset, signup confirmation and optional moderator alerts
+SENDPULSE_API_KEY="REPLACE_WITH_ROTATED_SENDPULSE_KEY"
+MAIL_FROM="no-support@kennely.de"
+MAIL_REPLY_TO="mahmoudbankousli@gmail.com"
+MAIL_ENABLED="false"
+EMAIL_HOURLY_CAP="10"
+# Production Node.js hosting: NODE_ENV=production, HOST=0.0.0.0, PORT from host.

@@ -8,3 +8,5 @@
 - Chatbelege nur im Rahmen einer von einem Teilnehmer gemeldeten Konversation, mit Protokollierung. Kein allgemeiner unsichtbarer CEO-Vollzugriff.
 - Das Export-API liefert derzeit einen tabellarischen Teilauszug; individuelle DSGVO-Auskunft kann mehr umfassen. Ergänze ein vollständiges Auskunftsverfahren.
 - Keine vollständige automatische Rechtssicherheitszusage und keine Garantie auf Fehlerfreiheit.
+
+Netlify als Hostinganbieter / Datenverarbeiter zusätzlich aufnehmen, Auftragsverarbeitungsvertrag und eventuelle internationale Datentransfers prüfen. Datenflüsse der Netlify Edge Functions und des CDN berücksichtigen.

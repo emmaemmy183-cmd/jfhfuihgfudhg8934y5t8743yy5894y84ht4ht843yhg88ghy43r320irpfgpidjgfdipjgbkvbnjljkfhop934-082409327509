@@ -1,0 +1,47 @@
+# Kennely: Netlify Free, statische Oberfläche + serverlose Funktionen
+[build]
+  publish = "public"
+  command = "echo Kennely ohne Build-Schritt"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+[[edge_functions]]
+  function = "country-gate"
+  path = "/*"
+  excludedPath = ["/api/*"]
+
+[[redirects]]
+  from = "/legal/impressum"
+  to = "/legal/imprint.html"
+  status = 200
+
+[[redirects]]
+  from = "/legal/datenschutz"
+  to = "/legal/privacy.html"
+  status = 200
+
+[[redirects]]
+  from = "/legal/nutzungsbedingungen"
+  to = "/legal/terms.html"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Frame-Options = "DENY"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
