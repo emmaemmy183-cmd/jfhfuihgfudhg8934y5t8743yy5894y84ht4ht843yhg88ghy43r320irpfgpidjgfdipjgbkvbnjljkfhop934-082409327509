@@ -1,3 +1,7 @@
+# Kennely Social 2027.11 · Vollständige Netlify-Version
+
+**Neue Anleitung:** [INSTALLATION_VSCODE_NETLIFY.md](INSTALLATION_VSCODE_NETLIFY.md)
+
 # Kennely Social 2027.9
 
 Neu: [UPDATE_2027_9.md](UPDATE_2027_9.md) für das GitHub/Netlify-Update.

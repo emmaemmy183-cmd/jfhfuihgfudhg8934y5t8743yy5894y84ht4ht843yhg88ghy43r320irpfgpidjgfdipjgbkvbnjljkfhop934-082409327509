@@ -1,0 +1,123 @@
+/* Kennely 2027.11 | Mobile and team management stability layer
+   No new UI library. Fully responsive, touch-sized actions, iOS safe areas. */
+:root { --kn-touch: 44px; }
+html { -webkit-text-size-adjust: 100%; }
+/* Previously the empty toast sat over the centre bottom-nav button on iOS. */
+#toast { pointer-events: none; visibility: hidden; opacity: 0; }
+#toast.show { visibility: visible; opacity: 1; }
+body, #shell, .workarea, #content, .admin-panel { min-width: 0; }
+button, input, select, textarea { min-width: 0; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible,
+textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+#adminUsersResults { min-width: 0; }
+/* Layout is content-led, never lets the action group collapse user text. */
+.admin-user-result {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  width: 100%;
+  max-width: 100%;
+  align-items: start;
+  padding-block: 17px;
+  border-bottom: 1px solid var(--line);
+}
+.admin-user-result__identity { min-width: 0; max-width: 100%; }
+.admin-user-result__name { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.admin-user-result__handle {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  font-size: 15px;
+  line-height: 1.4;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+.admin-user-result__display-name { margin: 5px 0 0; font-size: 13px !important; color: var(--text) !important; overflow-wrap: anywhere; }
+.admin-user-result__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 11px;
+  margin: 7px 0 0;
+  font-size: 12px !important;
+  color: var(--muted);
+  line-height: 1.5;
+  overflow-wrap: normal !important;
+  word-break: normal;
+}
+.admin-user-result__status { border-radius: 999px; padding: 3px 9px; font-weight: 700; font-size: 11px; }
+.admin-user-result__status.is-active { color: #6bdda8; background: rgba(30,146,95,.14); }
+.admin-user-result__status.is-banned { color: #ff93a4; background: rgba(217,45,79,.12); }
+.admin-user-result__actions {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px !important;
+  width: 100%;
+  max-width: 100% !important;
+  margin: 0;
+  min-width: 0;
+}
+.admin-user-result__actions > button {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 0;
+  min-height: var(--kn-touch);
+  width: 100%;
+  padding: 9px 10px !important;
+  text-align: center;
+  font-size: 12px !important;
+  line-height: 1.25;
+  white-space: normal !important;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+.drawer-account { min-width: 0; }
+.drawer-account > div { flex: 1 1 auto; min-width: 0; }
+.drawer-account strong, .drawer-account small { max-width: 100%; }
+/* Plus glyph is a text fallback, reliable with iOS <use> SVG rendering. */
+#mobileNav [data-go="create"] .create-nav-plus {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  font-family: system-ui, sans-serif;
+  font-weight: 650;
+  font-size: 29px !important;
+  line-height: 34px !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  color: var(--accent) !important;
+}
+@media (min-width: 761px) {
+  .admin-user-result { grid-template-columns: minmax(0,1fr) minmax(0, min(51%,420px)); gap: 18px; }
+}
+@media (max-width: 760px) {
+  .admin-panel, .admin-user-result, #adminUsersResults { min-width: 0; max-width: 100%; }
+  .admin-user-result { grid-template-columns: minmax(0,1fr); grid-template-rows: auto auto; }
+  .admin-user-result__handle { font-size: 15px; }
+  .admin-user-result__meta { font-size: 12px; }
+  .mobile-top { padding-left: max(12px,env(safe-area-inset-left)) !important; padding-right: max(12px,env(safe-area-inset-right)) !important; }
+  .mobile-top .logo { min-width: 0; overflow: hidden; }
+  .mobile-top .logo strong { white-space: nowrap; }
+  .mobile-nav { padding-left: max(4px,env(safe-area-inset-left)) !important; padding-right: max(4px,env(safe-area-inset-right)) !important; }
+  .mobile-nav > .nav-item { flex: 1 1 0; min-width: 0; min-height: var(--kn-touch); }
+  .mobile-nav > .nav-item > span:not(.number-badge):not(.create-nav-plus) { text-overflow: ellipsis; overflow: hidden; max-width: 100%; }
+  .drawer-link { min-height: var(--kn-touch); }
+  .drawer-account .tag { flex: 0 0 auto; }
+  .modal-shell { min-width: 0; }
+  .field { min-width: 0; }
+}
+@media (max-width: 350px) {
+  .admin-user-result__actions { grid-template-columns: minmax(0,1fr); }
+  .mobile-nav > .nav-item > span:not(.number-badge):not(.create-nav-plus) { font-size: 9px !important; }
+  .mobile-top .logo strong { font-size: 16px !important; }
+  #mobileNav [data-go="create"] .create-nav-plus { font-size: 27px !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-user-result__actions button { transition: none !important; }
+}

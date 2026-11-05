@@ -117,7 +117,7 @@ function pathId(path, prefix) { return decodeURIComponent(path.slice(prefix.leng
 async function api(req, env) {
   noCrossOriginWrite(req);
   const url = new URL(req.url), path=url.pathname, method=req.method;
-  if (method==='GET' && path==='/api/health') return json({ ok:true, project:'Kennely', version:'2027.social.3', mailReady: mailConfigured(env), publicReady: String(env.REGISTRATION_MODE||'')==='public' && mailConfigured(env) && Boolean(env.PUBLIC_ORIGIN) });
+  if (method==='GET' && path==='/api/health') return json({ ok:true, project:'Kennely', version:'2027.social.11', mailReady: mailConfigured(env), publicReady: String(env.REGISTRATION_MODE||'')==='public' && mailConfigured(env) && Boolean(env.PUBLIC_ORIGIN) });
   if (method==='GET' && path==='/api/auth/username') {
     const username=String(url.searchParams.get('name')||'').trim().toLowerCase();
     const reason=await usernamePolicyFor(env,username);
