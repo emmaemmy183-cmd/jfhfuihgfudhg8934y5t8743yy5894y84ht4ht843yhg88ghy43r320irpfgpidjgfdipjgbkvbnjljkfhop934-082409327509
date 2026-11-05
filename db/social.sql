@@ -49,7 +49,7 @@ CREATE INDEX IF NOT EXISTS idx_social_threads_a ON social_threads(user_a,created
 CREATE INDEX IF NOT EXISTS idx_social_threads_b ON social_threads(user_b,created_at DESC);
 CREATE TABLE IF NOT EXISTS social_dms (
  id TEXT PRIMARY KEY,thread_id TEXT NOT NULL REFERENCES social_threads(id),sender_id TEXT NOT NULL REFERENCES users(id),
- body TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+ body TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,read_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_social_dms_thread ON social_dms(thread_id,created_at DESC);
 CREATE TABLE IF NOT EXISTS social_reports (

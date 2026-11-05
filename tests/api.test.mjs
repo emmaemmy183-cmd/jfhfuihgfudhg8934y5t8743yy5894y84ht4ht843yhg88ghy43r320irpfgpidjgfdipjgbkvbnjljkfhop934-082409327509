@@ -8,9 +8,9 @@ function createFakeTurso() {
   const main=new DatabaseSync(':memory:');const media=new DatabaseSync(':memory:');
   return Promise.all([
     readFile(new URL('../db/main.sql',import.meta.url),'utf8'),
-    readFile(new URL('../db/media.sql',import.meta.url),'utf8'),readFile(new URL('../db/social.sql',import.meta.url),'utf8'),readFile(new URL('../db/deutschland.sql',import.meta.url),'utf8')
-  ]).then(([a,b,c,d])=>{
-    main.exec(a);media.exec(b);main.exec(c);main.exec(d);
+    readFile(new URL('../db/media.sql',import.meta.url),'utf8'),readFile(new URL('../db/social.sql',import.meta.url),'utf8'),readFile(new URL('../db/deutschland.sql',import.meta.url),'utf8'),readFile(new URL('../db/2027_9.sql',import.meta.url),'utf8')
+  ]).then(([a,b,c,d,e])=>{
+    main.exec(a);media.exec(b);main.exec(c);main.exec(d);main.exec(e);
     const env={TURSO_MAIN_URL:'libsql://main.test',TURSO_MAIN_TOKEN:'token-main',TURSO_MEDIA_URL:'libsql://media.test',TURSO_MEDIA_TOKEN:'token-media',BETA_ACCESS_CODE:'an-example-private-beta-code',REGISTRATION_MODE:'local',LEGACY_DATING_ENABLED:'true',IP_HASH_SECRET:'long-random-abuse-salt-secret',ASSETS:{fetch:()=>new Response('static')}};
     const fakeFetch=async(url, init)=>{
       const database=String(url).includes('main.test')?main:media;
@@ -41,7 +41,7 @@ function call(env, route, method='GET', data=null, cookie=null, mime='applicatio
  const body=method==='GET'?undefined:(data===null?undefined: data instanceof Uint8Array?data:JSON.stringify(data));
  return worker.fetch(new Request('http://127.0.0.1:8787/api'+route,{method,headers,body}),env);
 }
-const register=(name,email,birthDate='2000-01-01')=>({name,username:email.split('@')[0].replace(/[^a-z0-9._]/g,'').padEnd(5,'x'),email,password:'Some-very-good-password-123!',birthDate,gender:'divers',city:'Köln',adult:true,terms:true,});
+const register=(name,email,birthDate='2000-01-01')=>({name,username:email.split('@')[0].replace(/[^a-z0-9._]/g,'').padEnd(10,'x'),email,password:'Some-very-good-password-123!',birthDate,gender:'divers',city:'Köln',adult:true,terms:true,});
 
 test('end-to-end: register, login, discover, match, message, picture, report, block, delete',async()=>{
  const {env, fakeFetch, main, media}=await createFakeTurso();
@@ -71,10 +71,10 @@ test('end-to-end: register, login, discover, match, message, picture, report, bl
   r=await call(env,'/members/search?q=ro','GET');assert.equal(r.status,401);
   r=await call(env,'/members/search?q=ro','GET',null,alexCookie);assert.equal(r.status,200);
   const searchResult=await r.json();assert.equal(searchResult.profiles.length,1);
-  assert.equal(searchResult.profiles[0].username,'robin');
+  assert.equal(searchResult.profiles[0].username,'robinxxxxx');
   assert.equal('email' in searchResult.profiles[0],false);
   r=await call(env,`/members/${robin.id}`,'GET',null,alexCookie);assert.equal(r.status,200);
-  let viewed=(await r.json()).profile;assert.equal(viewed.username,'robin');
+  let viewed=(await r.json()).profile;assert.equal(viewed.username,'robinxxxxx');
   assert.deepEqual(viewed.photos,[]);assert.equal('birthDate' in viewed,false);
   const discover=await (await call(env,'/discover','GET',null,alexCookie)).json();
   assert.equal(discover.profiles.length,1);assert.equal(discover.profiles[0].name,'Robin');
@@ -151,11 +151,11 @@ test('public registration requires working mail and existing local sessions are 
 test('username lookup rejects taken or invalid names, registration requires 10 characters', async()=>{
  const {env,fakeFetch,main,media}=await createFakeTurso();const before=globalThis.fetch;globalThis.fetch=fakeFetch;
  try{
-   let response=await call(env,'/auth/username?name=alexy');assert.equal((await response.json()).available,true);
-   response=await call(env,'/auth/register','POST',{...register('Al','al@example.test'),username:'alexa',password:'123456789'});assert.equal(response.status,400);
-   response=await call(env,'/auth/register','POST',{...register('Al','al@example.test'),username:'alexa',password:'1234567890'});assert.equal(response.status,201);
-   response=await call(env,'/auth/username?name=ALEXA');assert.equal((await response.json()).available,false);
-   response=await call(env,'/auth/register','POST',{...register('Be','be@example.test'),username:'AlExA'});assert.equal(response.status,409);
+   let response=await call(env,'/auth/username?name=alexatest1');assert.equal((await response.json()).available,true);
+   response=await call(env,'/auth/register','POST',{...register('Al','al@example.test'),username:'alexatest1',password:'123456789'});assert.equal(response.status,400);
+   response=await call(env,'/auth/register','POST',{...register('Al','al@example.test'),username:'alexatest1',password:'1234567890'});assert.equal(response.status,201);
+   response=await call(env,'/auth/username?name=ALEXATEST1');assert.equal((await response.json()).available,false);
+   response=await call(env,'/auth/register','POST',{...register('Be','be@example.test'),username:'AlExAtEsT1'});assert.equal(response.status,409);
  }finally{globalThis.fetch=before;main.close();media.close();}
 });
 

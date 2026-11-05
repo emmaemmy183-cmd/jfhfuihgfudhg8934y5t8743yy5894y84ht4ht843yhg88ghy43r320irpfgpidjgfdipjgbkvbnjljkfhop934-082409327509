@@ -1,5 +1,6 @@
 import {features, checkFeature, notify, getRole} from './features.js';
 import {socialRoutes,pruneSocial} from './social.js';
+import {controls,usernamePolicyFor} from './controls.js';
 import {sendMail, configured as mailConfigured} from './mail.js';
 import {LiveHub, pushLive} from './live.js';
 export {LiveHub};
@@ -39,11 +40,11 @@ async function getUser(req, env) {
   if (!token || !/^[a-f0-9]{64}$/.test(token)) return null;
   const hashed = await digest(token);
   const record = await one(env, `SELECT u.id, u.email, u.username, u.email_verified_at, u.is_admin, u.is_banned, (SELECT role FROM team_members t WHERE t.user_id=u.id) AS role,
-     p.display_name,p.birth_date,p.city,p.gender,p.looking_for,p.intent,p.bio,p.interests, (SELECT role FROM team_members t WHERE t.user_id=u.id) AS staff_role, (SELECT 1 FROM official_accounts o WHERE o.user_id=u.id) AS official,(SELECT ph.id FROM photos ph WHERE ph.user_id=u.id AND ph.status='approved' ORDER BY ph.created_at DESC LIMIT 1) AS photoId,p.visible
+     p.display_name,p.birth_date,p.city,p.gender,p.looking_for,p.intent,p.bio,p.interests,p.is_private, (SELECT role FROM team_members t WHERE t.user_id=u.id) AS staff_role, (SELECT 1 FROM official_accounts o WHERE o.user_id=u.id) AS official,(SELECT ph.id FROM photos ph WHERE ph.user_id=u.id AND ph.status='approved' ORDER BY ph.created_at DESC LIMIT 1) AS photoId,p.visible
      FROM sessions s JOIN users u ON u.id=s.user_id
      JOIN profiles p ON p.user_id=u.id
      WHERE s.token_hash=? AND s.expires_at > CURRENT_TIMESTAMP`, [hashed]);
-  return record?.is_banned ? null : record;
+  return record || null;
 }
 async function requireUser(req, env) {
   const user = await getUser(req,env);
@@ -54,14 +55,14 @@ function safeUser(row) {
   return {
     official:!!row.official, id:row.id, email:row.email, username:row.username, emailVerified:!!row.email_verified_at, name:row.display_name, age:yearsOld(row.birth_date),
     city:row.city, gender:row.gender, lookingFor:row.looking_for, intent:row.intent,
-    bio:row.bio, interests:JSON.parse(row.interests || '[]'), photoId:row.photoId||null, visible:!!row.visible,
+    bio:row.bio, interests:JSON.parse(row.interests || '[]'), photoId:row.photoId||null, visible:!!row.visible, isPrivate:!!row.is_private, suspended:!!row.is_banned,
     admin:!!row.role, role:row.role||null,
   };
 }
 function profile(row) {
   return { id:row.id, username:row.username||null, name:row.display_name, age:yearsOld(row.birth_date), city:row.city,
     gender:row.gender, intent:row.intent, bio:row.bio,
-    interests:JSON.parse(row.interests||'[]'), photoId:row.photo_id || null, staffRole:row.staff_role||null, official:!!row.official };
+    interests:JSON.parse(row.interests||'[]'), photoId:row.photo_id || null, staffRole:row.staff_role||null, official:!!row.official, isPrivate:!!row.is_private, labels:row.labels||[] };
 }
 async function loginSession(req, env, userId) {
   const token = randomToken();
@@ -116,10 +117,11 @@ function pathId(path, prefix) { return decodeURIComponent(path.slice(prefix.leng
 async function api(req, env) {
   noCrossOriginWrite(req);
   const url = new URL(req.url), path=url.pathname, method=req.method;
-  if (method==='GET' && path==='/api/health') return json({ ok:true, project:'Kennely', version:'2027.social.2', mailReady: mailConfigured(env), publicReady: String(env.REGISTRATION_MODE||'')==='public' && mailConfigured(env) && Boolean(env.PUBLIC_ORIGIN) });
+  if (method==='GET' && path==='/api/health') return json({ ok:true, project:'Kennely', version:'2027.social.3', mailReady: mailConfigured(env), publicReady: String(env.REGISTRATION_MODE||'')==='public' && mailConfigured(env) && Boolean(env.PUBLIC_ORIGIN) });
   if (method==='GET' && path==='/api/auth/username') {
     const username=String(url.searchParams.get('name')||'').trim().toLowerCase();
-    if(!/^[a-z][a-z0-9._]{4,23}$/.test(username)) return json({available:false,valid:false,reason:'Mindestens 5 Zeichen, beginnt mit einem Buchstaben. Nur a-z, 0-9, Punkt und Unterstrich.'});
+    const reason=await usernamePolicyFor(env,username);
+    if(reason)return json({available:false,valid:false,reason});
     const existing=await one(env,'SELECT 1 AS used FROM users WHERE username=? COLLATE NOCASE',[username]);
     return json({available:!existing,valid:true,reason:existing?'Nutzername existiert schon.':''});
   }
@@ -170,9 +172,9 @@ async function api(req, env) {
     if(!['local','public'].includes(mode))error(503,'Registrierung ist noch nicht freigegeben.');
     const email=validateEmail(d.email),password=String(d.password||''),name=clean(d.name,32);
     const username=String(d.username||'').trim().toLowerCase();
-    if(!/^[a-z][a-z0-9._]{4,23}$/.test(username))error(400,'Nutzername muss mindestens 5 Zeichen haben und mit einem Buchstaben beginnen.');
+    const usernameError=await usernamePolicyFor(env,username);if(usernameError)error(400,usernameError);
     if(password.length<10||password.length>128)error(400,'Passwort muss mindestens 10 Zeichen enthalten.');
-    if(name.length<2)error(400,'Bitte Namen eingeben.');
+    // Der Anzeigename ist optional; ein fehlender Anzeigename wird als Nutzername angezeigt.
     if(!isAdult(d.birthDate)||d.adult!==true||d.terms!==true)error(400,'Kennely ist ab 16 Jahren.');
     if(!['frau','mann','divers'].includes(d.gender))error(400,'Bitte Geschlecht auswählen.');
     if(await one(env,'SELECT 1 AS e FROM users WHERE email=?',[email]))error(409,'Ein Konto mit dieser E-Mail besteht bereits.');
@@ -182,7 +184,7 @@ async function api(req, env) {
       await main(env,'INSERT INTO users(id,email,username,password_hash,password_salt,password_iterations,email_verified_at) VALUES(?,?,?,?,?,?,?)',
         [id,email,username,pw.hash,pw.salt,pw.iterations,local&&mode==='local'?new Date().toISOString():null]);
       await main(env,'INSERT INTO profiles(user_id,display_name,birth_date,city,gender) VALUES(?,?,?,?,?)',
-        [id,name,d.birthDate,clean(d.city,64),d.gender]);
+        [id,name||username,d.birthDate,clean(d.city,64),d.gender]);
     }catch(e){await main(env,'DELETE FROM users WHERE id=?',[id]).catch(()=>{});throw e;}
     if(mode==='public'){
       const secret=randomToken();
@@ -205,7 +207,7 @@ async function api(req, env) {
     const email=validateEmail(d.email), password=String(d.password||'');
     if (password.length<1 || password.length>128) error(401,'E-Mail oder Passwort ist nicht korrekt.');
     const row=await one(env,'SELECT * FROM users WHERE email=?',[email]);
-    if (!row || row.is_banned || !await verifyPassword(password,row.password_hash,row.password_salt,row.password_iterations)) error(401,'E-Mail oder Passwort ist nicht korrekt.');
+    if (!row || !await verifyPassword(password,row.password_hash,row.password_salt,row.password_iterations)) error(401,'E-Mail oder Passwort ist nicht korrekt.');
     const cookie=await loginSession(req,env,row.id);
     const user=await getUser(new Request(req.url,{headers:{Cookie:cookie}}),env);
     return json({user:{...safeUser(user),photos:(await main(env,'SELECT id FROM photos WHERE user_id=?',[row.id])).rows.map(p=>p.id)}},200,{'Set-Cookie':cookie});
@@ -227,7 +229,12 @@ async function api(req, env) {
   }
   const user=await requireUser(req,env);
   const isLocal=['localhost','127.0.0.1'].includes(url.hostname);
+  if(user.is_banned){
+    const control=await controls(req,env,user);if(control)return control;
+    error(403,'Dein Konto ist deaktiviert. Du kannst Einspruch einlegen.');
+  }
   if(!user.email_verified_at&&!isLocal) error(403,'Bitte bestätige zuerst deine E-Mail-Adresse.');
+  const control=await controls(req,env,user);if(control)return control;
   if(method==='GET' && path==='/api/live') {
     if(req.headers.get('Upgrade')?.toLowerCase()!=='websocket') error(426,'WebSocket required.');
     if(req.headers.get('Origin')!==url.origin) error(403,'Invalid WebSocket origin.');
@@ -293,10 +300,10 @@ async function api(req, env) {
   }
   if (method==='PATCH' && path==='/api/profile') {
     const d=await bodyLimited(req);
-    const name=clean(d.name,32), bio=clean(d.bio,650), city=clean(d.city,64);
+    const name=clean(d.name,32)||user.username, bio=clean(d.bio,650), city=clean(d.city,64);
     const gender=clean(d.gender,16), looking=clean(d.lookingFor,16),intent=clean(d.intent,32);
     const interests=[...new Set(Array.isArray(d.interests)?d.interests.map(x=>clean(x,24)).filter(Boolean):[])].slice(0,8);
-    if (name.length<2 || !['frau','mann','divers'].includes(gender) || !['alle','frauen','maenner','divers'].includes(looking) || !['offen','beziehung','dating','freundschaft'].includes(intent)) error(400,'Profilangaben überprüfen.');
+    if (!['frau','mann','divers'].includes(gender) || !['alle','frauen','maenner','divers'].includes(looking) || !['offen','beziehung','dating','freundschaft'].includes(intent)) error(400,'Profilangaben überprüfen.');
     await main(env,`UPDATE profiles SET display_name=?,bio=?,city=?,gender=?,looking_for=?,intent=?,interests=?,visible=?,updated_at=CURRENT_TIMESTAMP WHERE user_id=?`,
       [name,bio,city,gender,looking,intent,JSON.stringify(interests),d.visible===false?0:1,user.id]);
     return json({ok:true});
@@ -455,13 +462,14 @@ async function api(req, env) {
     const count=await one(env,'SELECT COUNT(*) AS n FROM photos WHERE user_id=?',[user.id]);
     if (count.n>=6) error(400,'Maximal sechs Profilfotos möglich.');
     const bytes=new Uint8Array(await req.arrayBuffer()); validateImage(bytes,mime);
-    const id=crypto.randomUUID();
+    const id=crypto.randomUUID(), trusted=['owner','admin','manager','moderator'].includes(user.role),status=trusted?'approved':'pending';
     await media(env,'INSERT INTO media(id,owner_id,mime,content) VALUES(?,?,?,?)',[id,user.id,mime,bytes]);
-    try { await main(env,"INSERT INTO photos(id,user_id,mime,status) VALUES(?,?,?,'pending')",[id,user.id,mime]);
-      const mods=(await main(env,"SELECT user_id FROM team_members WHERE role IN ('owner','admin','manager','moderator') LIMIT 12")).rows;
-      for(const mod of mods)await notify(env,mod.user_id,'photo_review','Neues Profilfoto','Ein Bild wartet auf Freigabe.',user.id); }
-    catch(e) { await media(env,'DELETE FROM media WHERE id=?',[id]); throw e; }
-    return json({id,status:'pending',message:'Dein Foto wird vor der Veröffentlichung vom Team geprüft.'},201);
+    try { await main(env,'INSERT INTO photos(id,user_id,mime,status) VALUES(?,?,?,?)',[id,user.id,mime,status]);
+      if(!trusted){const mods=(await main(env,"SELECT user_id FROM team_members WHERE role IN ('owner','admin','manager','moderator') LIMIT 12")).rows;
+        for(const mod of mods)await notify(env,mod.user_id,'photo_review','Neues Profilfoto','Ein Bild wartet auf Freigabe.',user.id);
+      }
+    } catch(e) { await media(env,'DELETE FROM media WHERE id=?',[id]); throw e; }
+    return json({id,status,message:trusted?'Profilfoto veröffentlicht.':'Dein Foto wird vor der Veröffentlichung vom Team geprüft.'},201);
   }
   if (path.startsWith('/api/photos/') && method==='GET') {
     const id=pathId(path,'/api/photos/');
@@ -522,6 +530,11 @@ async function api(req, env) {
       ['DELETE FROM social_post_likes WHERE user_id=? OR post_id IN (SELECT id FROM social_posts WHERE user_id=?)',[user.id,user.id]],
       ['DELETE FROM social_post_saves WHERE user_id=? OR post_id IN (SELECT id FROM social_posts WHERE user_id=?)',[user.id,user.id]],
       ['DELETE FROM social_comments WHERE user_id=? OR post_id IN (SELECT id FROM social_posts WHERE user_id=?)',[user.id,user.id]],
+      ['DELETE FROM social_follow_requests WHERE follower_id=? OR following_id=?',[user.id,user.id]],
+      ['DELETE FROM social_story_likes WHERE user_id=? OR story_id IN (SELECT id FROM social_stories WHERE user_id=?)',[user.id,user.id]],
+      ['DELETE FROM profile_labels WHERE user_id=?',[user.id]],
+      ['DELETE FROM staff_permissions WHERE user_id=?',[user.id]],
+      ['DELETE FROM account_states WHERE user_id=?',[user.id]],
       ['DELETE FROM social_follows WHERE follower_id=? OR following_id=?',[user.id,user.id]],
       ['DELETE FROM social_posts WHERE user_id=?',[user.id]],
       ['DELETE FROM social_stories WHERE user_id=?',[user.id]],
@@ -594,7 +607,7 @@ export default {
     } catch(e) {
       if (e instanceof ApiError || (Number.isInteger(e?.status)&&e.status>=400&&e.status<=503)) return json({error:e.message},e.status);
       console.error('Kennenly API exception',e?.message);
-      return json({error:'Ein technischer Fehler ist aufgetreten. Prüfe Server-Einstellungen und Datenbankmigration.'},500);
+      return json({error:'Ein technischer Fehler ist aufgetreten. Bitte versuche es erneut.'},500);
     }
   }
 };

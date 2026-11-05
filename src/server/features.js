@@ -3,6 +3,7 @@ import {sendMail,configured as mailConfigured} from './mail.js';
 import { main, one } from './db.js';
 import {clean, digest, cookieValue,sessionCookie} from './security.js';
 import {pushLive} from './live.js';
+import {allowed,suspendWithReason,reinstate} from './controls.js';
 export class FeatureError extends Error { constructor(status, message){super(message); this.status=status;} }
 const fail=(n,m)=>{throw new FeatureError(n,m);};
 const uid=()=>crypto.randomUUID();
@@ -122,7 +123,7 @@ export async function features(req,env,user){const url=new URL(req.url),p=url.pa
   return json({reports,tickets,team,role:user.role,profilePhotos,mediaPending,textsPending});
  }
  if(m==='GET'&&p==='/api/admin/users'){
-  requireStaff(user,'moderator');const query=clean(url.searchParams.get('q'),75);if(query.length<2)return json({users:[]});
+  if(!await allowed(env,user,'user.inspect') && roleLevel(user.role)<2)fail(403,'Kein Zugriff.');const query=clean(url.searchParams.get('q'),75);if(query.length<2)return json({users:[]});
   // Prefix matching avoids expensive full substring searches; only operational metadata is returned.
   const prefix=query.replace(/[/%_]/g,c=>'/'+c)+'%';
   const rows=(await main(env,`SELECT u.id,u.username,p.display_name AS name,u.is_banned AS banned,t.role,
@@ -135,7 +136,7 @@ export async function features(req,env,user){const url=new URL(req.url),p=url.pa
   return json({users:rows});
  }
  if(m==='GET'&&/^\/api\/admin\/users\/[a-f\d-]{36}$/i.test(p)){
-  requireStaff(user,'manager');
+  if(!await allowed(env,user,'user.inspect'))fail(403,'Kein Zugriff.');
   const id=guardId(p.split('/').pop()),reason=clean(url.searchParams.get('reason'),200);
   if(reason.length<10)fail(400,'Bitte einen konkreten dienstlichen Grund angeben (mindestens 10 Zeichen).');
   const detail=await one(env,`SELECT u.id,u.username,u.created_at AS createdAt,u.last_login_at AS lastLoginAt,
@@ -149,7 +150,7 @@ export async function features(req,env,user){const url=new URL(req.url),p=url.pa
   return json({user:detail});
  }
  if(m==='POST'&&p==='/api/admin/team'){
-  requireStaff(user,'owner');const d=await data(req),target=guardId(d.userId);
+  if(!await allowed(env,user,'team.manage'))fail(403,'Nur der CEO kann Rollen verwalten.');const d=await data(req),target=guardId(d.userId);
   if(!['admin','manager','moderator','support','remove'].includes(d.role))fail(400,'Invalid role.');if(target===user.id)fail(400,'Cannot modify your own role.');
   await userExists(env,target);const existing=await getRole(env,target);if(existing==='owner')fail(403,'Owner roles can only be changed offline.');
   if(d.role==='remove') await main(env,'DELETE FROM team_members WHERE user_id=?',[target]);
@@ -172,7 +173,9 @@ export async function features(req,env,user){const url=new URL(req.url),p=url.pa
    await main(env,`INSERT INTO user_restrictions(id,user_id,feature,reason,until_at,imposed_by) VALUES(?,?,?,?,datetime('now',?),?)`,[uid(),target,feature,reason,`+${days} days`,user.id]);
    await notify(env,target,'restriction','Feature restricted',`${feature}: ${reason}`,user.id);
   } else if(action==='ban' || action==='unban'){
-   requireStaff(user,'admin');await main(env,'UPDATE users SET is_banned=? WHERE id=?',[action==='ban'?1:0,target]);
+   if(!await allowed(env,user,'account.suspend'))fail(403,'Keine Berechtigung.');
+   if(action==='ban')await suspendWithReason(env,user,target,reason,String(d.ruleId||'community'));
+   else await reinstate(env,user,target,reason);
   } else fail(400,'Unknown action.');
   let emailSent=false,emailError=null;
   if(d.notifyEmail===true && ['warning','restrict','ban'].includes(action)){

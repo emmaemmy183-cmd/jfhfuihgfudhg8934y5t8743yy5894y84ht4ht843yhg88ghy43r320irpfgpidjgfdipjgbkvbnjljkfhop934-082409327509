@@ -1,3 +1,7 @@
+# Kennely Social 2027.9
+
+Neu: [UPDATE_2027_9.md](UPDATE_2027_9.md) für das GitHub/Netlify-Update.
+
 # Kennely Social 2027.7 · Netlify Free
 
 Deutsche fotoorientierte Social-Media-Plattform ab 16 Jahren. Die Oberfläche liegt statisch auf Netlify, die API läuft in Netlify Functions und nutzt weiterhin deine beiden Turso-Datenbanken.

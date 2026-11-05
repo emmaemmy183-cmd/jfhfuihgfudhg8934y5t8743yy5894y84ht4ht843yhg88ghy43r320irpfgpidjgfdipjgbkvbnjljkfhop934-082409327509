@@ -1,10 +1,12 @@
 import { readFile } from 'node:fs/promises';
 import { execute } from '../src/server/db.js';
 const env = process.env;
-const scripts = [['main','db/main.sql'], ['media','db/media.sql'], ['main','db/social.sql'], ['main','db/deutschland.sql'], ['main','db/mail_quotas.sql']];
+const scripts = [['main','db/main.sql'], ['media','db/media.sql'], ['main','db/social.sql'], ['main','db/deutschland.sql'], ['main','db/mail_quotas.sql'], ['main','db/2027_9.sql']];
 // Extend existing user databases before CREATE INDEX statements reference the new columns.
 const upgrades = {
  users: {username: 'TEXT COLLATE NOCASE', email_verified_at: 'TEXT', last_login_at: 'TEXT'},
+ profiles:{is_private:'INTEGER NOT NULL DEFAULT 0'},
+ social_dms:{read_at:'TEXT'},
  photos: {status: "TEXT NOT NULL DEFAULT 'pending'", reviewed_at:'TEXT', reviewed_by:'TEXT', rejection_reason:'TEXT'}
 };
 for (const [table, columns] of Object.entries(upgrades)) {

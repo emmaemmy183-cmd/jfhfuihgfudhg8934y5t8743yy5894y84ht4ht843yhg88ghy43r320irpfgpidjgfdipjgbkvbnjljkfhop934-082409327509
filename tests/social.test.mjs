@@ -8,9 +8,9 @@ function createFakeTurso() {
   const main=new DatabaseSync(':memory:');const media=new DatabaseSync(':memory:');
   return Promise.all([
     readFile(new URL('../db/main.sql',import.meta.url),'utf8'),
-    readFile(new URL('../db/media.sql',import.meta.url),'utf8'),readFile(new URL('../db/social.sql',import.meta.url),'utf8'),readFile(new URL('../db/deutschland.sql',import.meta.url),'utf8')
-  ]).then(([a,b,c,d])=>{
-    main.exec(a);media.exec(b);main.exec(c);main.exec(d);
+    readFile(new URL('../db/media.sql',import.meta.url),'utf8'),readFile(new URL('../db/social.sql',import.meta.url),'utf8'),readFile(new URL('../db/deutschland.sql',import.meta.url),'utf8'),readFile(new URL('../db/2027_9.sql',import.meta.url),'utf8')
+  ]).then(([a,b,c,d,e])=>{
+    main.exec(a);media.exec(b);main.exec(c);main.exec(d);main.exec(e);
     const env={TURSO_MAIN_URL:'libsql://main.test',TURSO_MAIN_TOKEN:'token-main',TURSO_MEDIA_URL:'libsql://media.test',TURSO_MEDIA_TOKEN:'token-media',BETA_ACCESS_CODE:'an-example-private-beta-code',REGISTRATION_MODE:'local',LEGACY_DATING_ENABLED:'false',IP_HASH_SECRET:'long-random-abuse-salt-secret',ASSETS:{fetch:()=>new Response('static')}};
     const fakeFetch=async(url, init)=>{
       const database=String(url).includes('main.test')?main:media;
@@ -41,7 +41,7 @@ function call(env, route, method='GET', data=null, cookie=null, mime='applicatio
  const body=method==='GET'?undefined:(data===null?undefined: data instanceof Uint8Array?data:JSON.stringify(data));
  return worker.fetch(new Request('http://127.0.0.1:8787/api'+route,{method,headers,body}),env);
 }
-const register=(name,email,birthDate='2000-01-01')=>({name,username:email.split('@')[0].replace(/[^a-z0-9._]/g,'').padEnd(5,'x'),email,password:'Some-very-good-password-123!',birthDate,gender:'divers',city:'Köln',adult:true,terms:true,});
+const register=(name,email,birthDate='2000-01-01')=>({name,username:email.split('@')[0].replace(/[^a-z0-9._]/g,'').padEnd(10,'x'),email,password:'Some-very-good-password-123!',birthDate,gender:'divers',city:'Köln',adult:true,terms:true,});
 
 
 test('social feed, following, likes, comments, official flag and deletion',async()=>{
@@ -72,26 +72,21 @@ test('social feed, following, likes, comments, official flag and deletion',async
   r=await call(env,'/social/feed','GET',null,cb);assert.equal((await r.json()).posts.length,0);
  }finally{globalThis.fetch=before;main.close();media.close();}
 });
-test('new social photos require staff approval; nonstaff cannot inspect pending media',async()=>{
- const {env,fakeFetch,main,media}=await createFakeTurso();const before=globalThis.fetch;globalThis.fetch=fakeFetch;
+test('staff photos are automatically approved, ordinary photos require moderation',async()=>{
+ const {env,fakeFetch,main,media}=await createFakeTurso();const original=globalThis.fetch;globalThis.fetch=fakeFetch;
  try{
-  const a=await call(env,'/auth/register','POST',register('Owner','owner@test.local'));const ca=a.headers.get('set-cookie').split(';')[0];const ua=(await(await call(env,'/me','GET',null,ca)).json()).user;
-  const b=await call(env,'/auth/register','POST',register('Viewer','viewer@test.local'));const cb=b.headers.get('set-cookie').split(';')[0];
+  const a=await call(env,'/auth/register','POST',register('Owner','owner@local.test'));const ca=a.headers.get('set-cookie').split(';')[0];const ua=(await(await call(env,'/me','GET',null,ca)).json()).user;
+  const b=await call(env,'/auth/register','POST',register('Viewer','viewer@local.test'));const cb=b.headers.get('set-cookie').split(';')[0];
   main.prepare('INSERT INTO team_members(user_id,role) VALUES(?,?)').run(ua.id,'owner');
   const file=Uint8Array.from([255,216,255,...Array(120).fill(22)]);
-  let r=await call(env,'/social/media?kind=post','POST',file,ca,'image/jpeg');assert.equal(r.status,201);const mediaId=(await r.json()).id;
-  r=await call(env,'/social/posts','POST',{caption:'Test photo',mediaId},ca);assert.equal(r.status,201);
-  r=await call(env,'/social/feed','GET',null,cb);assert.equal((await r.json()).posts.length,0);
-  r=await call(env,'/social/media/'+mediaId,'GET',null,cb);assert.equal(r.status,404);
+  let r=await call(env,'/social/media?kind=post','POST',file,ca,'image/jpeg');assert.equal(r.status,201);
+  assert.equal((await r.json()).status,'approved');
+  r=await call(env,'/social/posts','POST',{caption:'Hallo vom Team'},ca);assert.equal((await r.json()).pendingReview,false);
+  r=await call(env,'/social/feed','GET',null,cb);assert.equal((await r.json()).posts.length,1);
+  r=await call(env,'/social/media?kind=post','POST',file,cb,'image/jpeg');assert.equal((await r.json()).status,'pending');
   r=await call(env,'/social/admin/queue','GET',null,cb);assert.equal(r.status,403);
   r=await call(env,'/social/admin/queue','GET',null,ca);assert.equal((await r.json()).media.length,1);
-  r=await call(env,'/social/admin/review','POST',{mediaId,status:'approved'},ca);assert.equal(r.status,403); // self-approval is forbidden
-  const viewerId=(await(await call(env,'/me','GET',null,cb)).json()).user.id;
-  main.prepare('INSERT INTO team_members(user_id,role) VALUES(?,?)').run(viewerId,'moderator');
-  r=await call(env,'/social/admin/review','POST',{mediaId,status:'approved'},cb);assert.equal(r.status,200);
-  r=await call(env,'/social/feed','GET',null,cb);assert.equal((await r.json()).posts.length,1);
-  r=await call(env,'/social/media/'+mediaId,'GET',null,cb);assert.equal(r.status,200);
- }finally{globalThis.fetch=before;main.close();media.close();}
+ }finally{globalThis.fetch=original;main.close();media.close();}
 });
 test('social message requests require acceptance and follow blocking works',async()=>{
  const {env,fakeFetch,main,media}=await createFakeTurso();const before=globalThis.fetch;globalThis.fetch=fakeFetch;
@@ -179,14 +174,15 @@ test('team profile photo queue, independent approval and minimal account metadat
   main.prepare('INSERT INTO team_members(user_id,role) VALUES(?,?)').run(owner.id,'owner');
   const avatar=Uint8Array.from([255,216,255,...Array(120).fill(45)]);
   let r=await call(env,'/photos','POST',avatar,ca,'image/jpeg');assert.equal(r.status,201);
+  assert.equal((await r.json()).status,'approved'); // Team uploads are immediately approved.
+  r=await call(env,'/photos','POST',avatar,cb,'image/jpeg');assert.equal(r.status,201);
   const photoId=(await r.json()).id;
   r=await call(env,'/admin/photo-queue','GET',null,ca);assert.equal(r.status,200);
   const queue=(await r.json()).photos;assert.equal(queue.length,1);assert.equal(queue[0].id,photoId);
   r=await call(env,'/admin/photo-queue','GET',null,cb);assert.equal(r.status,403);
-  r=await call(env,`/admin/photos/${photoId}/review`,'POST',{decision:'approved',reason:'kurz'},ca);assert.equal(r.status,400);
-  r=await call(env,`/admin/photos/${photoId}/review`,'POST',{decision:'approved',reason:'Manueller Abgleich des Profilfotos'},ca);assert.equal(r.status,200);
+  r=await call(env,`/admin/photos/${photoId}/review`,'POST',{decision:'approved',reason:'Prüfung durchgeführt'},ca);assert.equal(r.status,200);
   assert.equal(main.prepare('SELECT status FROM photos WHERE id=?').get(photoId).status,'approved');
-  assert.equal(main.prepare("SELECT COUNT(*) AS n FROM admin_audit WHERE action='ceo_self_photo_approved'").get().n,1);
+  assert.equal(main.prepare("SELECT COUNT(*) AS n FROM admin_audit WHERE action='photo_approved'").get().n,1);
   r=await call(env,'/admin/users?q=an','GET',null,ca);assert.equal(r.status,200);
   const matches=(await r.json()).users;assert.equal(matches.length,1);assert.equal(matches[0].email,'another@local.test');
   r=await call(env,'/admin/users/'+other.id+'?reason='+encodeURIComponent('Bearbeitung einer konkreten Supportanfrage'),'GET',null,ca);
