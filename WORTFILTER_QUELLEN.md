@@ -16,3 +16,16 @@ Treffer führen bei Inhalten **zur menschlichen Prüfung**, nicht zu einer
 unwiderruflichen Löschung. Treffer in Nutzernamen werden abgewiesen.
 Kontext, Zitate, Reclamations und regionale Besonderheiten können Fehlalarme
 verursachen. CEO/Moderation kann einzelne Regeln ergänzen oder ausnehmen.
+
+### Ergänzung 2027.14
+
+Zusätzlich verwendet Kennely das npm-Paket `cuss` Version 2.2.0 (MIT-Lizenz,
+© Titus Wormer; https://github.com/words/cuss). Eingebunden werden **ausschließlich**
+Einträge mit der höchsten Konfidenzbewertung `2` aus Englisch, Arabisch
+(Lateinschrift), Spanisch, Französisch, Italienisch und Portugiesisch.
+Kontext und harmlose Homonyme machen menschliche Prüfung weiterhin notwendig.
+Wörter mit der Wertung 0 oder 1 werden aus dieser Quelle nicht übernommen.
+
+**Prüfung nach `npm install`:** `npm run policy:count`. Die kombinierte eindeutige
+Gesamtzahl muss >= 3.000 sein. Kann der Wert nicht erreicht werden, ist dies
+eine offene Einschränkung, keine bestandene Sicherheitsprüfung.

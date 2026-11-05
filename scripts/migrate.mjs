@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { execute } from '../src/server/db.js';
+import { MIGRATION_FILES, migrationStatements } from './migration-plan.mjs';
 const env = process.env;
-const scripts = [['main','db/main.sql'], ['media','db/media.sql'], ['main','db/social.sql'], ['main','db/deutschland.sql'], ['main','db/mail_quotas.sql'], ['main','db/2027_9.sql'], ['main','db/2027_10.sql'], ['main','db/2027_12.sql'];
 // Extend existing user databases before CREATE INDEX statements reference the new columns.
 const upgrades = {
  users: {username: 'TEXT COLLATE NOCASE', email_verified_at: 'TEXT', last_login_at: 'TEXT', username_changed_at:'TEXT'},
@@ -21,10 +21,10 @@ for (const [table, columns] of Object.entries(upgrades)) {
     }
   }
 }
-for (const [database, path] of scripts) {
+for (const [database, path] of MIGRATION_FILES) {
   console.log(`Installing ${path} in ${database} ...`);
   const sql = await readFile(new URL(`../${path}`, import.meta.url), 'utf8');
-  const statements = sql.split(';').map(s => s.trim()).filter(Boolean);
+  const statements = migrationStatements(sql);
   for (const statement of statements) await execute(env, database, `${statement};`);
   console.log(`OK: ${statements.length} statements applied`);
 }

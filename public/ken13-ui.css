@@ -1,4 +1,4 @@
-/* Kennely 2027.13 — clearly accessible account settings, zero external UI dependencies. */
+/* Kennely 2027.14 — clearly accessible account settings, zero external UI dependencies. */
 .settings-version{font-size:11px;color:var(--muted);margin:-8px 0 14px;font-weight:600;}
 #settingsGrid{align-items:start;scroll-margin-top:86px}
 .setting-priority{border-color:color-mix(in srgb,var(--accent) 36%,var(--line))!important}

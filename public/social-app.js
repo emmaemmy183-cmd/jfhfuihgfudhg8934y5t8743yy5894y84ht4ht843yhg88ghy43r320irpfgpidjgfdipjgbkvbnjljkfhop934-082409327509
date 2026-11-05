@@ -205,7 +205,7 @@ async function renderNotifications(){const data=await api('/notifications');if(m
 // A broken /blocks or /settings request must never hide privacy or identity controls.
 async function renderSettings(){
  const ownerName=model.me?.username||'';
- display(`${page('Einstellungen und Aktivitäten','Privatsphäre und Profil direkt verwalten')}<div class="settings-version" aria-label="Kennely Version">Kennely 2027.13</div>
+ display(`${page('Einstellungen und Aktivitäten','Privatsphäre und Profil direkt verwalten')}<div class="settings-version" aria-label="Kennely Version">Kennely 2027.14</div>
  <div class="settings-grid" id="settingsGrid">
  <section class="setting-group setting-priority" id="privacySettingsSection"><div class="setting-heading">${icon('shield')}<div><h3>Deine Privatsphäre</h3><p>Entscheide, wer dein Profil sehen und mit dir interagieren darf.</p></div></div>
  <div id="privacySettingsPanel" class="column" aria-live="polite"><div class="privacy-preview"><span>Privates Konto</span><span>${model.me?.isPrivate?'Aktiv':'Aus'}</span></div><p class="tiny">Deine Einstellungen werden geladen …</p></div></section>

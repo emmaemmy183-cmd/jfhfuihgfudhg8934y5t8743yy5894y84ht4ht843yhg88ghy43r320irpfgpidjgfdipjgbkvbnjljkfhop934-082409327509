@@ -1,4 +1,4 @@
-# Kennely Social 2027.13 – vollständiges Netlify-Projekt
+# Kennely Social 2027.14 – vollständiges Netlify-Projekt
 
 **Neu:** [UPDATE_2027_13.md](UPDATE_2027_13.md). Privates Konto und Profilidentität direkt sichtbar, unabhängig von fehlerhaften Nebenabfragen.
 

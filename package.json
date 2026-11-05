@@ -1,6 +1,6 @@
 {
   "name": "kennely",
-  "version": "2027.13.0",
+  "version": "2027.14.0",
   "private": true,
   "type": "module",
   "description": "Kennely Social DE ab 16: Netlify Functions, Turso, Fotos, Stories und Nachrichten",
@@ -12,7 +12,7 @@
     "test": "node --test tests/*.test.mjs",
     "owner:assign": "node --env-file=.dev.vars scripts/assign-owner.mjs",
     "official:assign": "node --env-file=.dev.vars scripts/assign-official.mjs",
-    "check:js": "node --check netlify/functions/api.mjs && node --check netlify/edge-functions/country-gate.js && node --check public/social-app.js && node --check src/server/index.js && node --check src/server/social.js && node --check src/server/controls.js && node --check src/server/features.js",
+    "check:js": "node --check netlify/functions/api.mjs && node --check netlify/edge-functions/country-gate.js && node --check public/social-app.js && node --check src/server/index.js && node --check src/server/social.js && node --check src/server/controls.js && node --check src/server/features.js && node --check scripts/migrate.mjs && node --check scripts/migration-plan.mjs",
     "db:schema": "node --env-file=.dev.vars scripts/check-schema.mjs",
     "start": "node server/node-server.mjs",
     "user:delete": "node --env-file=.dev.vars scripts/delete-user.mjs",
@@ -25,6 +25,7 @@
     "node": ">=20.10.0"
   },
   "dependencies": {
-    "naughty-words": "1.2.0"
+    "naughty-words": "1.2.0",
+    "cuss": "2.2.0"
   }
 }
