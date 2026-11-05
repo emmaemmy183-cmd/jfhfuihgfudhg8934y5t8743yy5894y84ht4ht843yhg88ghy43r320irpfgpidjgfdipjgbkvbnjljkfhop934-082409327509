@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS media (
+  id TEXT PRIMARY KEY,
+  owner_id TEXT NOT NULL,
+  mime TEXT NOT NULL,
+  content BLOB NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_media_owner ON media(owner_id);
