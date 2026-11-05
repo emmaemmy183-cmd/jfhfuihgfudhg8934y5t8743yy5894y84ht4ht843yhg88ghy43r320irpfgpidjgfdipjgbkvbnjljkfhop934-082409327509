@@ -111,14 +111,42 @@ export async function features(req,env,user){const url=new URL(req.url),p=url.pa
  }
  if(m==='GET'&&p==='/api/admin/overview'){
   requireStaff(user,'support');
-  const reports=(await one(env,"SELECT COUNT(*) AS n FROM reports WHERE status='open'"))?.n||0;
-  const tickets=(await one(env,"SELECT COUNT(*) AS n FROM support_tickets WHERE status IN ('open','waiting')"))?.n||0;
-  const team=(await main(env,`SELECT t.user_id AS id,t.role,u.email,p.display_name AS name FROM team_members t JOIN users u ON u.id=t.user_id JOIN profiles p ON p.user_id=t.user_id ORDER BY CASE t.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 WHEN 'manager' THEN 2 WHEN 'moderator' THEN 3 ELSE 4 END LIMIT 100`)).rows;
-  return json({reports,tickets,team,role:user.role});
+  const counts=await one(env,`SELECT
+    (SELECT COUNT(*) FROM reports WHERE status='open') AS reports,
+    (SELECT COUNT(*) FROM support_tickets WHERE status IN ('open','waiting')) AS tickets,
+    (SELECT COUNT(*) FROM photos WHERE status='pending') AS profilePhotos,
+    (SELECT COUNT(*) FROM social_media WHERE status='pending') AS mediaPending,
+    (SELECT COUNT(*) FROM content_reviews WHERE status='pending') AS textsPending`);
+  const {reports=0,tickets=0,profilePhotos=0,mediaPending=0,textsPending=0}=counts||{};
+  const team=(await main(env,`SELECT t.user_id AS id,t.role,p.display_name AS name FROM team_members t JOIN profiles p ON p.user_id=t.user_id ORDER BY CASE t.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 WHEN 'manager' THEN 2 WHEN 'moderator' THEN 3 ELSE 4 END LIMIT 100`)).rows;
+  return json({reports,tickets,team,role:user.role,profilePhotos,mediaPending,textsPending});
  }
  if(m==='GET'&&p==='/api/admin/users'){
   requireStaff(user,'moderator');const query=clean(url.searchParams.get('q'),75);if(query.length<2)return json({users:[]});
-  const rows=(await main(env,`SELECT u.id,u.email,p.display_name AS name,u.is_banned AS banned,t.role FROM users u JOIN profiles p ON u.id=p.user_id LEFT JOIN team_members t ON t.user_id=u.id WHERE u.email LIKE ? OR p.display_name LIKE ? OR u.username LIKE ? LIMIT 25`,['%'+query+'%','%'+query+'%','%'+query+'%'])).rows;return json({users:rows});
+  // Prefix matching avoids expensive full substring searches; only operational metadata is returned.
+  const prefix=query.replace(/[/%_]/g,c=>'/'+c)+'%';
+  const rows=(await main(env,`SELECT u.id,u.username,p.display_name AS name,u.is_banned AS banned,t.role,
+     u.created_at AS createdAt,u.email_verified_at AS emailVerifiedAt
+     FROM users u JOIN profiles p ON u.id=p.user_id LEFT JOIN team_members t ON t.user_id=u.id
+     WHERE u.username LIKE ? ESCAPE '/' OR u.email LIKE ? ESCAPE '/' OR p.display_name LIKE ? ESCAPE '/'
+     ORDER BY u.created_at DESC LIMIT 25`,[prefix,prefix,prefix])).rows;
+  // Only the CEO may obtain email in a directory search to assign staff roles.
+  if(user.role==='owner'){for(const item of rows){const account=await one(env,'SELECT email FROM users WHERE id=?',[item.id]);item.email=account?.email||null;}}
+  return json({users:rows});
+ }
+ if(m==='GET'&&/^\/api\/admin\/users\/[a-f\d-]{36}$/i.test(p)){
+  requireStaff(user,'manager');
+  const id=guardId(p.split('/').pop()),reason=clean(url.searchParams.get('reason'),200);
+  if(reason.length<10)fail(400,'Bitte einen konkreten dienstlichen Grund angeben (mindestens 10 Zeichen).');
+  const detail=await one(env,`SELECT u.id,u.username,u.created_at AS createdAt,u.last_login_at AS lastLoginAt,
+    u.email_verified_at AS emailVerifiedAt,u.is_banned AS banned,t.role,p.display_name AS name,
+    p.city,p.visible FROM users u JOIN profiles p ON p.user_id=u.id
+    LEFT JOIN team_members t ON t.user_id=u.id WHERE u.id=?`,[id]);
+  if(!detail)fail(404,'Konto nicht gefunden.');
+  // Email visibility is restricted to admins and owner. No passwords, private chat or IP history.
+  if(roleLevel(user.role)>=4){const account=await one(env,'SELECT email FROM users WHERE id=?',[id]);detail.email=account?.email||null;}
+  await audit(env,user.id,'account_detail_view',id,reason);
+  return json({user:detail});
  }
  if(m==='POST'&&p==='/api/admin/team'){
   requireStaff(user,'owner');const d=await data(req),target=guardId(d.userId);

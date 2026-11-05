@@ -263,7 +263,7 @@ export async function socialRoutes(req,env,user){const url=new URL(req.url),path
  }
  if(method==='POST'&&path==='/api/social/admin/review'){
   staff(user);const d=await body(req),id=idGuard(d.mediaId),status=d.status;
-  if(!['approved','rejected'].includes(status))err(400,'Choose approve or reject');const row=await one(env,'SELECT * FROM social_media WHERE id=?',[id]);if(!row||row.status!=='pending')err(409,'Already decided');const reason=clean(d.reason,600);
+  if(!['approved','rejected'].includes(status))err(400,'Choose approve or reject');const row=await one(env,'SELECT * FROM social_media WHERE id=?',[id]);if(!row||row.status!=='pending')err(409,'Already decided');if(row.user_id===user.id)err(403,'Eigene Medien darfst du nicht freigeben.');const reason=clean(d.reason,600);
   if(status==='rejected'&&reason.length<6)err(400,'Give a reason');
   await main(env,'UPDATE social_media SET status=?,reviewed_by=?,review_reason=? WHERE id=? AND status=\'pending\'',[status,user.id,reason,id]);
   await audit(env,user.id,'social_media_'+status,id,reason);
@@ -286,7 +286,7 @@ export async function socialRoutes(req,env,user){const url=new URL(req.url),path
   staff(user);const d=await body(req),id=idGuard(d.id),type=String(d.type||''),status=String(d.status||'');
   if(!['post','story','comment'].includes(type)||!['approved','rejected'].includes(status))err(400,'Ungültige Entscheidung');
   const entry=await one(env,'SELECT * FROM content_reviews WHERE content_type=? AND content_id=?',[type,id]);
-  if(!entry||entry.status!=='pending')err(409,'Schon entschieden');
+  if(!entry||entry.status!=='pending')err(409,'Schon entschieden');if(entry.user_id===user.id)err(403,'Eigene Inhalte darfst du nicht freigeben.');
   const reason=clean(d.reason,600);if(status==='rejected'&&reason.length<6)err(400,'Bitte begründen');
   await main(env,"UPDATE content_reviews SET status=?,reviewer_id=?,reason=?,decided_at=CURRENT_TIMESTAMP WHERE content_type=? AND content_id=? AND status='pending'",[status,user.id,reason,type,id]);
   if(type==='story'&&status==='approved')await main(env,"UPDATE social_stories SET expires_at=datetime('now','+24 hours') WHERE id=?",[id]);

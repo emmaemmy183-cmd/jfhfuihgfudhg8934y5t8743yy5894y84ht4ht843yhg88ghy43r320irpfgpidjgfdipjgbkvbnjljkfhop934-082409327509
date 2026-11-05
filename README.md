@@ -22,3 +22,6 @@ Deutsche fotoorientierte Social-Media-Plattform ab 16 Jahren. Die Oberfläche li
 - `scripts/`: Migrationen und Verwaltung bestehender Accounts.
 
 Die sicherheitskritischen Zugangsdaten gehören **nur** in die lokale `.env` bzw. Netlify Environment Variables. Alte Schlüssel, die in Chats oder einem Repository sichtbar waren, unbedingt ersetzen.
+
+
+Version 2027.8: mobiles Schnellmenü, responsive Teamzentrale, Profilfoto-Warteschlange, optimistische UI-Aktionen, schlanke Nutzerverwaltung mit abgestuften Rollen, Audit und Zeitstempeln. Konkrete Updateanleitung: NETLIFY_EINRICHTUNG.md.

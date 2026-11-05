@@ -57,7 +57,7 @@ Variablen als geheim behandeln und nach Änderungen **Redeploy** auslösen. Nich
 
 ## 7. Echtzeit auf Netlify Free
 
-Netlify Functions besitzen **keinen dauerhaft laufenden Chat-Server**. Diese Version aktualisiert offene Nachrichten alle 15 Sekunden, Benachrichtigungen alle 60 Sekunden und bei erneuter Tab-Aktivierung. Eine Live-Tippanzeige ist hier deaktiviert. Für sekundengenaue Echtzeit später einen externen Realtime-Anbieter ergänzen (mit zusätzlichen Kontingenten/Kosten).
+Netlify Functions besitzen **keinen dauerhaft laufenden Chat-Server**. Diese Version aktualisiert offene Nachrichten bei geöffnetem Chat ungefähr alle 12 Sekunden, Benachrichtigungszähler ungefähr alle 36 Sekunden und bei erneuter Tab-Aktivierung. Eine Live-Tippanzeige ist hier deaktiviert. Für sekundengenaue Echtzeit später einen externen Realtime-Anbieter ergänzen (mit zusätzlichen Kontingenten/Kosten).
 
 ## 8. Kosten und Kapazität
 
@@ -68,3 +68,32 @@ Netlify Free bietet derzeit **300 Credits pro Monat** mit hartem Limit. Jede Sei
 Netlify zeigt die Website, wenn du `COUNTRY_LOCK=off` verwendest, auch außerhalb Deutschlands. Bei `DE` setzt der Edge-Länderfilter für statische Seiten und die API eine Geo-IP-Sperre um, die durch VPNs umgangen werden kann.
 
 Die Ausweisprüfung fehlt weiterhin, auch bei 16+ ist eine Selbstauskunft keine sichere Altersprüfung. Die Rechtstexte der Vorlage müssen auf den tatsächlichen Hoster Netlify und Datenverarbeitungen geprüft werden. Nicht automatisch öffentlich registrieren lassen, nur weil ein Deploy erfolgreich war.
+
+## 10. Update in VS Code auf GitHub und Netlify
+
+1. ZIP entpacken. Inhalt des neuen Kennely-Ordners in das bereits geklonte `kennely-github`-Verzeichnis kopieren und vorhandene Projektdateien ersetzen. **Den vorhandenen `.git`-Ordner niemals löschen oder überschreiben.** Keine `.dev.vars`, `.env` oder sonstige geheimen Schlüssel kopieren.
+2. Änderungen im Repository-Terminal prüfen: `git status`.
+3. `npm install` und `npm test` ausführen. Bei Problemen zuerst diese beheben.
+4. `git add -A`, dann `git diff --cached --name-only` prüfen, dass keine geheimen Dateien im Commit enthalten sind.
+5. `git commit -m "Kennely 2027.8: Navigation und Performance"` und `git push origin main`.
+6. Netlify → Deploys öffnen, Deployment prüfen. Neue Features erst nach erfolgreichem Deploy und, sofern nötig, der gesicherten Datenbankmigration verwenden.
+
+### Benutzerkonten mit bestehendem Löschskript aus Turso entfernen
+
+Vor der Löschung **beide Datenbanken sichern**. Das Skript arbeitet über zwei Datenbanken, also nicht atomar.
+
+Vorschau: `npm run user:delete -- --email=beispiel@example.com`
+
+Nach Prüfung dauerhaft löschen: `npm run user:delete -- --email=beispiel@example.com --bestaetigen`
+
+Es verwendet die lokale `.dev.vars`. Das Skript darf nur für rechtmäßig zu löschende Konten ausgeführt werden.
+
+### Mitarbeiterbereich
+
+Ein bestehendes CEO-Konto öffnet **Menü → Team und Moderation → Team**. Über die exakte Benutzername-Suche kann der CEO anderen Konten Rollen vergeben. Moderator und höhere Rollen können Profilfotos prüfen. Niemand darf eigene Bilder freigeben. Das CEO-Profilfoto muss somit von einer anderen, dazu berechtigten Person kontrolliert werden.
+
+Die Nutzersuche zeigt sparsame Kontoinformationen, Details benötigen Manager oder höhere Rechte und einen dokumentierten Anlass. Kontakt-E-Mails erscheinen ausschließlich in berechtigten Detailansichten (Admin oder CEO). Passwortdaten und private Nachrichten sind nicht einsehbar. Das letzte Login wird nur bei erfolgreichem Login geschrieben, nicht bei jedem Seitenaufruf.
+
+### Probelauf unbedingt mit zwei Accounts
+
+Mit Konto A ein Profilfoto hochladen. Mit Konto B (Moderator oder höher) im Team den Punkt **Profilfotos** öffnen und freigeben. Mit beiden Konten Folgen, Like, Chat und Benachrichtigungen prüfen. Erst danach öffentlich freischalten.

@@ -85,7 +85,10 @@ test('new social photos require staff approval; nonstaff cannot inspect pending 
   r=await call(env,'/social/media/'+mediaId,'GET',null,cb);assert.equal(r.status,404);
   r=await call(env,'/social/admin/queue','GET',null,cb);assert.equal(r.status,403);
   r=await call(env,'/social/admin/queue','GET',null,ca);assert.equal((await r.json()).media.length,1);
-  r=await call(env,'/social/admin/review','POST',{mediaId,status:'approved'},ca);assert.equal(r.status,200);
+  r=await call(env,'/social/admin/review','POST',{mediaId,status:'approved'},ca);assert.equal(r.status,403); // self-approval is forbidden
+  const viewerId=(await(await call(env,'/me','GET',null,cb)).json()).user.id;
+  main.prepare('INSERT INTO team_members(user_id,role) VALUES(?,?)').run(viewerId,'moderator');
+  r=await call(env,'/social/admin/review','POST',{mediaId,status:'approved'},cb);assert.equal(r.status,200);
   r=await call(env,'/social/feed','GET',null,cb);assert.equal((await r.json()).posts.length,1);
   r=await call(env,'/social/media/'+mediaId,'GET',null,cb);assert.equal(r.status,200);
  }finally{globalThis.fetch=before;main.close();media.close();}
@@ -163,5 +166,33 @@ test('Deutschlandsperre schützt API und HTML, lokale Entwicklung bleibt möglic
   const page=new Request('https://kennely.de/');Object.defineProperty(page,'cf',{value:{country:'FR'}});
   assert.equal((await worker.fetch(page,env)).status,451);
   assert.equal((await worker.fetch(new Request('http://127.0.0.1:8787/api/me'),env)).status,200);
+ }finally{globalThis.fetch=original;main.close();media.close();}
+});
+
+test('team profile photo queue, independent approval and minimal account metadata',async()=>{
+ const {env,fakeFetch,main,media}=await createFakeTurso();const original=globalThis.fetch;globalThis.fetch=fakeFetch;
+ try{
+  const a=await call(env,'/auth/register','POST',register('Owner','owner@local.test'));assert.equal(a.status,201);
+  const ca=a.headers.get('set-cookie').split(';')[0];const owner=(await(await call(env,'/me','GET',null,ca)).json()).user;
+  const b=await call(env,'/auth/register','POST',register('Another','another@local.test'));assert.equal(b.status,201);
+  const cb=b.headers.get('set-cookie').split(';')[0];const other=(await(await call(env,'/me','GET',null,cb)).json()).user;
+  main.prepare('INSERT INTO team_members(user_id,role) VALUES(?,?)').run(owner.id,'owner');
+  const avatar=Uint8Array.from([255,216,255,...Array(120).fill(45)]);
+  let r=await call(env,'/photos','POST',avatar,ca,'image/jpeg');assert.equal(r.status,201);
+  const photoId=(await r.json()).id;
+  r=await call(env,'/admin/photo-queue','GET',null,ca);assert.equal(r.status,200);
+  const queue=(await r.json()).photos;assert.equal(queue.length,1);assert.equal(queue[0].id,photoId);
+  r=await call(env,'/admin/photo-queue','GET',null,cb);assert.equal(r.status,403);
+  r=await call(env,`/admin/photos/${photoId}/review`,'POST',{decision:'approved',reason:'kurz'},ca);assert.equal(r.status,400);
+  r=await call(env,`/admin/photos/${photoId}/review`,'POST',{decision:'approved',reason:'Manueller Abgleich des Profilfotos'},ca);assert.equal(r.status,200);
+  assert.equal(main.prepare('SELECT status FROM photos WHERE id=?').get(photoId).status,'approved');
+  assert.equal(main.prepare("SELECT COUNT(*) AS n FROM admin_audit WHERE action='ceo_self_photo_approved'").get().n,1);
+  r=await call(env,'/admin/users?q=an','GET',null,ca);assert.equal(r.status,200);
+  const matches=(await r.json()).users;assert.equal(matches.length,1);assert.equal(matches[0].email,'another@local.test');
+  r=await call(env,'/admin/users/'+other.id+'?reason='+encodeURIComponent('Bearbeitung einer konkreten Supportanfrage'),'GET',null,ca);
+  assert.equal(r.status,200);const detail=(await r.json()).user;
+  assert.equal(detail.email,'another@local.test');assert.ok(detail.lastLoginAt);assert.ok(detail.createdAt);
+  assert.equal('password_hash' in detail,false);
+  assert.equal(main.prepare("SELECT COUNT(*) AS n FROM admin_audit WHERE action='account_detail_view'").get().n,1);
  }finally{globalThis.fetch=original;main.close();media.close();}
 });

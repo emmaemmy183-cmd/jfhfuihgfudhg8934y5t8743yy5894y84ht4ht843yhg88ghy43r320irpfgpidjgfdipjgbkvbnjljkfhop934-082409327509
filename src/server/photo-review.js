@@ -17,10 +17,11 @@ export async function photoReviewRoutes(req,env,user){
  if(path==='/api/admin/photo-queue'&&method==='GET'){
    staff(user);
    const rows=(await main(env,`SELECT ph.id,ph.user_id,ph.status,ph.created_at,ph.rejection_reason AS reason,
-     p.display_name AS name,u.username,u.email,
+     (SELECT role FROM team_members t WHERE t.user_id=ph.user_id) AS uploaderRole,
+     p.display_name AS name,u.username,
      (SELECT COUNT(*) FROM photo_review_notes n WHERE n.photo_id=ph.id) AS forwards
      FROM photos ph JOIN users u ON u.id=ph.user_id JOIN profiles p ON p.user_id=u.id
-     WHERE ph.status IN ('pending','rejected') ORDER BY CASE ph.status WHEN 'pending' THEN 0 ELSE 1 END, ph.created_at DESC LIMIT 100`)).rows;
+     WHERE ph.status='pending' ORDER BY ph.created_at ASC LIMIT 60`)).rows;
    const assigned=(await main(env,`SELECT n.id,n.photo_id,n.note,n.created_at,p.display_name AS from_name
      FROM photo_review_notes n JOIN profiles p ON p.user_id=n.from_staff_id
      WHERE n.to_staff_id=? ORDER BY n.created_at DESC LIMIT 50`,[user.id])).rows;
@@ -42,8 +43,13 @@ export async function photoReviewRoutes(req,env,user){
    FROM photos ph JOIN users u ON u.id=ph.user_id WHERE ph.id=?`,[photoId]);
  if(!photo)error(404,'Foto nicht gefunden.');
  const uploaderRole=(await one(env,'SELECT role FROM team_members WHERE user_id=?',[photo.user_id]))?.role;
- if(level(uploaderRole)>=level(user.role))error(403,'Überprüfung gleichrangiger Teammitglieder nicht erlaubt.');
+ const selfReview=photo.user_id===user.id;
+ if(selfReview && user.role!=='owner')error(403,'Eigene Profilfotos darf niemand selbst freigeben.');
+ // Owner profile photos can be independently reviewed by a different admin.
+ if(!selfReview && level(uploaderRole)>=level(user.role) && !(uploaderRole==='owner' && level(user.role)>=4))
+   error(403,'Überprüfung gleichrangiger Teammitglieder nicht erlaubt.');
  if(action==='forward'){
+   if(selfReview)error(403,'Eigene Fotos können nicht selbst weitergeleitet werden.');
    if(photo.status!=='pending')error(409,'Nur offene Fotos können weitergeleitet werden.');
    const recipient=String(body.toStaffId||''),message=humanReason(body.note);
    if(!valid(recipient)||recipient===user.id||message.length<8)error(400,'Bitte Mitarbeiter und Nachricht angeben.');
@@ -58,6 +64,7 @@ export async function photoReviewRoutes(req,env,user){
  if(!['approved','rejected'].includes(body.decision))error(400,'Bitte Freigeben oder Ablehnen wählen.');
  if(photo.status!=='pending')error(409,'Dieses Foto wurde schon entschieden. Aktualisiere die Warteschlange.');
  const reason=humanReason(body.reason);
+ if(selfReview && reason.length<10)error(400,'CEO-Eigenfreigabe benötigt eine dokumentierte Begründung (mindestens 10 Zeichen).');
  if(body.decision==='rejected'&&reason.length<8)error(400,'Bitte eine nachvollziehbare Begründung eingeben.');
  const moderation=String(body.moderation||'none');
  if(!['none','warning','restrict','ban'].includes(moderation))error(400,'Ungültige Maßnahme.');
@@ -69,7 +76,7 @@ export async function photoReviewRoutes(req,env,user){
    [body.decision,user.id,body.decision==='rejected'?reason:null,photoId]);
  await main(env,'INSERT INTO photo_review_actions(id,photo_id,actor_id,action,note) VALUES(?,?,?,?,?)',
    [uid(),photoId,user.id,body.decision,reason]);
- await audit(env,user.id,'photo_'+body.decision,photoId,reason);
+ await audit(env,user.id,selfReview?'ceo_self_photo_'+body.decision:'photo_'+body.decision,photoId,reason);
  await note(env,photo.user_id,'photo','Profilfoto '+(body.decision==='approved'?'freigegeben':'abgelehnt'),reason||'Dein Foto kann jetzt im Profil angezeigt werden.',user.id);
  if(moderation==='warning'){
    await main(env,'INSERT INTO moderation_warnings(id,target_id,actor_id,reason) VALUES(?,?,?,?)',[uid(),photo.user_id,user.id,reason]);

@@ -180,3 +180,30 @@ test('photo moderation: staff review and forward while ordinary members cannot r
    assert.equal(main.prepare('SELECT COUNT(*) AS n FROM moderation_warnings').get().n,1);
  }finally{globalThis.fetch=before;main.close();media.close();}
 });
+
+test('role-scoped user search and audited account metadata expose no passwords or chats',async()=>{
+ const {env,fakeFetch,main,media}=await createFakeTurso();const oldFetch=globalThis.fetch;globalThis.fetch=fakeFetch;
+ try{
+  const a=await call(env,'/auth/register','POST',register('Owner','auditowner@local.test'));const ownerCookie=a.headers.get('set-cookie').split(';')[0];
+  const b=await call(env,'/auth/register','POST',register('Mara','auditmara@local.test'));const maraCookie=b.headers.get('set-cookie').split(';')[0];
+  const c=await call(env,'/auth/register','POST',register('Manager','auditmanager@local.test'));const managerCookie=c.headers.get('set-cookie').split(';')[0];
+  const o=(await(await call(env,'/me','GET',null,ownerCookie)).json()).user;
+  const u=(await(await call(env,'/me','GET',null,maraCookie)).json()).user;
+  const mg=(await(await call(env,'/me','GET',null,managerCookie)).json()).user;
+  main.prepare('INSERT INTO team_members(user_id,role) VALUES(?,?)').run(o.id,'owner');
+  main.prepare('INSERT INTO team_members(user_id,role) VALUES(?,?)').run(mg.id,'manager');
+  let r=await call(env,'/admin/users?q=auditm','GET',null,maraCookie);assert.equal(r.status,403);
+  r=await call(env,'/admin/users?q=auditm','GET',null,managerCookie);assert.equal(r.status,200);
+  const listed=(await r.json()).users;assert.ok(listed.some(x=>x.id===u.id));
+  assert.equal('email' in listed[0],false);
+  assert.equal('password_hash' in listed[0],false);
+  const detailPath='/admin/users/'+u.id+'?reason=Supportfall+aus+der+Nutzerverwaltung';
+  r=await call(env,detailPath,'GET',null,maraCookie);assert.equal(r.status,403);
+  r=await call(env,detailPath,'GET',null,managerCookie);assert.equal(r.status,200);
+  const managerView=(await r.json()).user;assert.ok(managerView.createdAt);assert.ok(managerView.lastLoginAt);
+  assert.equal('email' in managerView,false);assert.equal('password_hash' in managerView,false);
+  r=await call(env,detailPath,'GET',null,ownerCookie);assert.equal(r.status,200);
+  assert.equal((await r.json()).user.email,'auditmara@local.test');
+  assert.equal(main.prepare("SELECT COUNT(*) AS n FROM admin_audit WHERE action='account_detail_view'").get().n,2);
+ }finally{globalThis.fetch=oldFetch;main.close();media.close();}
+});

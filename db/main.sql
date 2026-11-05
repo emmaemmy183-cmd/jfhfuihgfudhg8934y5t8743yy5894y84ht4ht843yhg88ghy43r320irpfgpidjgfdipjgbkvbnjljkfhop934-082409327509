@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
   password_salt TEXT NOT NULL,
   password_iterations INTEGER NOT NULL,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_login_at TEXT,
   is_admin INTEGER NOT NULL DEFAULT 0,
   is_banned INTEGER NOT NULL DEFAULT 0,
   email_verified_at TEXT
@@ -17,6 +18,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_users_created ON users(created_at DESC);
 CREATE TABLE IF NOT EXISTS profiles (
   user_id TEXT PRIMARY KEY REFERENCES users(id),
   display_name TEXT NOT NULL,
@@ -30,6 +32,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   visible INTEGER NOT NULL DEFAULT 1,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX IF NOT EXISTS idx_profiles_name ON profiles(display_name COLLATE NOCASE);
 CREATE TABLE IF NOT EXISTS photos (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id),

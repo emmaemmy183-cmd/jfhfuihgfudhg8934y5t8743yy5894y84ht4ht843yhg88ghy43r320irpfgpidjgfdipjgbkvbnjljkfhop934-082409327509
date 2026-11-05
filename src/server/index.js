@@ -66,6 +66,8 @@ function profile(row) {
 async function loginSession(req, env, userId) {
   const token = randomToken();
   await main(env, `INSERT INTO sessions(token_hash,user_id,expires_at) VALUES (?, ?, datetime('now','+7 days'))`, [await digest(token),userId]);
+  // Exactly one lightweight write per successful login/new account session.
+  await main(env, 'UPDATE users SET last_login_at=CURRENT_TIMESTAMP WHERE id=?',[userId]);
   return sessionCookie(token,req);
 }
 function validateEmail(input) {
@@ -114,15 +116,7 @@ function pathId(path, prefix) { return decodeURIComponent(path.slice(prefix.leng
 async function api(req, env) {
   noCrossOriginWrite(req);
   const url = new URL(req.url), path=url.pathname, method=req.method;
- if (method==='GET' && path==='/api/health') return json({
-  ok: true,
-  project: 'Kennely',
-  version: '2027.social.1',
-  mailReady: mailConfigured(env),
-  publicReady: env.REGISTRATION_MODE === 'public' &&
-               mailConfigured(env) &&
-               env.MAIL_FROM === 'no-support@kennely.de'
-});
+  if (method==='GET' && path==='/api/health') return json({ ok:true, project:'Kennely', version:'2027.social.2', mailReady: mailConfigured(env), publicReady: String(env.REGISTRATION_MODE||'')==='public' && mailConfigured(env) && Boolean(env.PUBLIC_ORIGIN) });
   if (method==='GET' && path==='/api/auth/username') {
     const username=String(url.searchParams.get('name')||'').trim().toLowerCase();
     if(!/^[a-z][a-z0-9._]{4,23}$/.test(username)) return json({available:false,valid:false,reason:'Mindestens 5 Zeichen, beginnt mit einem Buchstaben. Nur a-z, 0-9, Punkt und Unterstrich.'});
