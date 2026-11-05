@@ -1,3 +1,7 @@
+# Kennely Social 2027.13 – vollständiges Netlify-Projekt
+
+**Neu:** [UPDATE_2027_13.md](UPDATE_2027_13.md). Privates Konto und Profilidentität direkt sichtbar, unabhängig von fehlerhaften Nebenabfragen.
+
 # Kennely Social 2027.12 · vollständiges Netlify-Projekt
 
 Eine fotoorientierte Social-Media-Plattform ab 16 Jahren mit Feed, Entdecken,

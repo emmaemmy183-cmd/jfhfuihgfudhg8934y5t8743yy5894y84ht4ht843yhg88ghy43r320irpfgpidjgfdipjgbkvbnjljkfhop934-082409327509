@@ -89,6 +89,24 @@ export async function controls(req,env,user){
  if(method==='PATCH'&&path==='/api/account/identity'){
   const d=await parse(req);
   if(d.username===undefined&&d.name===undefined)throwHttp(400,'Keine Änderungen angegeben.');
+  // Preflight both cooldowns before writing either field. Prevent a partial update
+  // (username changed but display-name rejected) in the common two-field form.
+  const currentIdentity=await one(env,`SELECT u.username,u.username_changed_at AS usernameChangedAt,
+    p.display_name AS name,p.display_name_changed_at AS nameChangedAt
+    FROM users u JOIN profiles p ON p.user_id=u.id WHERE u.id=?`,[user.id]);
+  if(!currentIdentity)throwHttp(404,'Profil nicht gefunden.');
+  if(d.username!==undefined){
+   const value=String(d.username||'').trim().toLowerCase();
+   if(value!==currentIdentity.username && currentIdentity.usernameChangedAt &&
+      Date.parse(String(currentIdentity.usernameChangedAt).replace(' ','T')+(String(currentIdentity.usernameChangedAt).includes('T')?'':'Z'))+30*86400000>Date.now())
+     throwHttp(429,'Nutzername kann nur alle 30 Tage geändert werden.');
+  }
+  if(d.name!==undefined){
+   const value=clean(d.name,32);
+   if(value!==String(currentIdentity.name||'') && currentIdentity.nameChangedAt &&
+      Date.parse(String(currentIdentity.nameChangedAt).replace(' ','T')+(String(currentIdentity.nameChangedAt).includes('T')?'':'Z'))+7*86400000>Date.now())
+     throwHttp(429,'Anzeigename kann nur alle 7 Tage geändert werden.');
+  }
   if(d.username!==undefined){
    const username=String(d.username||'').trim().toLowerCase();
    const reason=await usernamePolicyFor(env,username);if(reason)throwHttp(400,reason);

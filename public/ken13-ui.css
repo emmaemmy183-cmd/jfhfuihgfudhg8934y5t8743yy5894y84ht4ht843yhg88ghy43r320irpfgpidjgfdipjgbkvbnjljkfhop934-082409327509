@@ -1,0 +1,26 @@
+/* Kennely 2027.13 — clearly accessible account settings, zero external UI dependencies. */
+.settings-version{font-size:11px;color:var(--muted);margin:-8px 0 14px;font-weight:600;}
+#settingsGrid{align-items:start;scroll-margin-top:86px}
+.setting-priority{border-color:color-mix(in srgb,var(--accent) 36%,var(--line))!important}
+.setting-heading{display:flex;align-items:flex-start;gap:11px;margin-bottom:17px}
+.setting-heading>svg{flex:0 0 auto;width:24px;height:24px;color:var(--accent);margin-top:1px}
+.setting-heading h3{font-size:17px;margin:0 0 5px}
+.setting-heading p{font-size:12px;color:var(--muted);line-height:1.55;margin:0}
+#settingsGrid .setting-group{min-width:0;overflow-wrap:break-word;display:flex;flex-direction:column;gap:8px}
+#settingsGrid .setting-group>.button{width:100%;min-height:44px}
+#settingsGrid .check-row.privacy-switch{display:flex;align-items:flex-start;gap:12px;font-size:13px;padding:11px 0;color:var(--text);cursor:pointer;line-height:1.5}
+#settingsGrid .privacy-switch input{width:20px;height:20px;flex:0 0 auto;margin-top:1px;accent-color:var(--accent)}
+#settingsGrid .privacy-switch small{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+#settingsGrid #privacyForm{min-width:0;gap:13px}
+#settingsGrid #privacyForm .button{min-height:46px;width:100%}
+#settingsGrid .privacy-preview{display:flex;align-items:center;justify-content:space-between;font-weight:700;font-size:14px;border:1px solid var(--line);border-radius:13px;padding:13px}
+#settingsGrid .identity-overview{display:grid;gap:10px;padding:13px;background:var(--surface2);border-radius:13px}
+#settingsGrid .identity-overview div{display:grid;gap:4px;min-width:0;overflow-wrap:anywhere}
+#settingsGrid .identity-overview small{color:var(--muted);font-size:11px}
+#settingsGrid .identity-overview strong{font-size:14px;overflow-wrap:anywhere}
+#settingsGrid .settings-inline-error{color:#ed7288;font-size:12px;line-height:1.6;margin:5px 0}
+#settingsGrid #settingsPreferencesError[hidden]{display:none}
+#settingsGrid .setting-group select,#settingsGrid .setting-group input,#settingsGrid .setting-group textarea{max-width:100%}
+#identityForm input[readonly]{opacity:.75;cursor:not-allowed;background:var(--surface2)}
+@media(max-width:760px){#settingsGrid{grid-template-columns:minmax(0,1fr)!important;gap:12px}#settingsGrid .setting-group{padding:19px!important}#settingsGrid .setting-heading h3{font-size:16px}#settingsGrid .setting-group .button{min-height:44px}}
+@media(min-width:761px){#settingsGrid>.setting-priority{min-height:290px}}

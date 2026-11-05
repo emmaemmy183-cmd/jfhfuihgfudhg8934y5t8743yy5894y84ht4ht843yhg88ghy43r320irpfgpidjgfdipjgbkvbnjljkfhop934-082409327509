@@ -154,3 +154,33 @@ test('2027.12: diverse Registrierung, Kommentarschutz, Auffindbarkeit und Beitra
   assert.equal(r.status,400);
  }finally{globalThis.fetch=old;main.close();media.close();}
 });
+
+test('2027.13: account identity rejects partial two-field update during display-name cooldown',async()=>{
+ const {env,fakeFetch,main,media}=await createFakeTurso(),old=globalThis.fetch;globalThis.fetch=fakeFetch;
+ try{
+  const response=await call(env,'/auth/register','POST',register('Startname','identitypreflight@local.test'));
+  const cookie=response.headers.get('set-cookie').split(';')[0];
+  const id=(await(await call(env,'/me','GET',null,cookie)).json()).user.id;
+  let r=await call(env,'/account/identity','PATCH',{name:'Erste Änderung'},cookie);assert.equal(r.status,200);
+  r=await call(env,'/account/identity','PATCH',{username:'sicherername2027',name:'Zweite Änderung'},cookie);
+  assert.equal(r.status,429);
+  const row=main.prepare('SELECT username FROM users WHERE id=?').get(id);
+  assert.equal(row.username,'identitypreflight');
+ }finally{globalThis.fetch=old;main.close();media.close();}
+});
+
+test('2027.13: legacy CEO account can set a missing username through own settings',async()=>{
+ const {env,fakeFetch,main,media}=await createFakeTurso(),old=globalThis.fetch;globalThis.fetch=fakeFetch;
+ try{
+  const response=await call(env,'/auth/register','POST',register('Chef','missingownername@local.test'));
+  const cookie=response.headers.get('set-cookie').split(';')[0],id=(await(await call(env,'/me','GET',null,cookie)).json()).user.id;
+  main.prepare('UPDATE users SET username=NULL WHERE id=?').run(id);
+  main.prepare("INSERT INTO team_members(user_id,role) VALUES(?,'owner')").run(id);
+  let r=await call(env,'/account/identity','GET',null,cookie);
+  assert.equal((await r.json()).identity.username,null);
+  r=await call(env,'/account/identity','PATCH',{username:'chefkennely2027'},cookie);
+  assert.equal(r.status,200,await r.text());
+  const me=(await(await call(env,'/me','GET',null,cookie)).json()).user;
+  assert.equal(me.username,'chefkennely2027');assert.equal(me.role,'owner');
+ }finally{globalThis.fetch=old;main.close();media.close();}
+});
