@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Kennely logo">
-<defs><linearGradient id="a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1032b6"/><stop offset=".45" stop-color="#650ed8"/><stop offset="1" stop-color="#ff189d"/></linearGradient><linearGradient id="s" x1="0" y1=".75" x2="1" y2=".25"><stop stop-color="#d5a4ff"/><stop offset=".55" stop-color="#f4a2fb"/><stop offset="1" stop-color="#fe45b6"/></linearGradient></defs>
-<rect width="256" height="256" rx="52" fill="url(#a)"/>
-<path fill="#fff" d="M67 64h46v65l50-65h50l-67 78 70 78h-54l-49-62v62H67z"/>
-<path d="M36 181c34 35 155-15 181-73 8-18 7-34 1-43 21 13 21 38 7 58-38 58-149 94-193 69-8-5-11-10-13-18 4 4 9 6 17 7z" fill="url(#s)"/>
-<path fill="#fff" d="m213 35 7 20 20 7-20 7-7 20-7-20-20-7 20-7z"/>
-</svg>
