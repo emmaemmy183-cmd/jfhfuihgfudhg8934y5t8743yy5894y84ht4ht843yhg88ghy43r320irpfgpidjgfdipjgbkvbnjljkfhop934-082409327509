@@ -8,6 +8,10 @@ const geoip=(await import('geoip-lite').catch(()=>null))?.default;
 import worker from '../src/server/index.js';
 import {one} from '../src/server/db.js';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'../public');
+// Cache only small, PUBLIC static assets. Never cache authenticated API responses.
+const staticCache=new Map();
+let staticCacheBytes=0;
+const STATIC_CACHE_LIMIT=1_500_000;
 const MIME={'.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.html':'text/html; charset=utf-8','.json':'application/json; charset=utf-8','.webmanifest':'application/manifest+json','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.ico':'image/x-icon','.webp':'image/webp'};
 const env={...process.env};
 const port=Number(env.PORT||8787);
@@ -22,7 +26,19 @@ const assets={async fetch(req){const path=new URL(req.url).pathname;let relative
  if(relative==='/'||!extname(relative))relative='/index.html';
  const filename=resolve(root,'.'+relative);
  if(!filename.startsWith(root+sep))return new Response('Nicht gefunden',{status:404});
- try{const file=await readFile(filename);return new Response(file,{headers:{'content-type':MIME[extname(filename)]||'application/octet-stream','cache-control':extname(filename)==='.html'?'no-store':'public, max-age=600'}})}catch{return new Response('Nicht gefunden',{status:404})}
+ try{
+  let file=staticCache.get(filename);
+  if(!file){
+    file=await readFile(filename);
+    if(file.byteLength<=350_000 && staticCacheBytes+file.byteLength<=STATIC_CACHE_LIMIT){
+      staticCache.set(filename,file);staticCacheBytes+=file.byteLength;
+    }
+  }
+  const ext=extname(filename);
+  const immutable=(ext==='.css'||ext==='.js')&&new URL(req.url).searchParams.has('v');
+  const cacheControl=ext==='.html'?'no-store':immutable?'public, max-age=31536000, immutable':'public, max-age=3600';
+  return new Response(file,{headers:{'content-type':MIME[ext]||'application/octet-stream','cache-control':cacheControl}});
+ }catch{return new Response('Nicht gefunden',{status:404})}
 }};
 env.ASSETS=assets;
 const clientIp=req=>{const raw=req.socket.remoteAddress||'';let ip=raw.replace(/^::ffff:/,'');
@@ -46,6 +62,7 @@ async function sse(req,res,url){
 }
 const server=createServer(async(req,res)=>{
  try{
+  const startedAt=Date.now();
   const ip=clientIp(req);
   const origin=env.PUBLIC_ORIGIN||`http://127.0.0.1:${port}`;
   const url=new URL(req.url||'/',origin);
@@ -72,6 +89,10 @@ const server=createServer(async(req,res)=>{
   if(method==='HEAD'){res.end();return}
   const buf=resp.body?Buffer.from(await resp.arrayBuffer()):Buffer.alloc(0);
   res.end(buf);
+  if(env.PERF_LOG==='true' && req.url?.startsWith('/api/') && Date.now()-startedAt>1000){
+    const route=url.pathname.replace(/[0-9a-f-]{36}/gi,':id');
+    console.warn('[Kennely slow request]',req.method,route,Date.now()-startedAt+'ms',resp.status);
+  }
  }catch(err){console.error('[Kennely]',err?.message);if(!res.headersSent){res.writeHead(err?.message==='Anfrage zu groß'?413:500,{'content-type':'application/json; charset=utf-8'});res.end(JSON.stringify({error:err?.message==='Anfrage zu groß'?'Anfrage zu groß':'Es ist ein technischer Fehler aufgetreten.'}))}else res.end()}
 });
 server.requestTimeout=30_000;

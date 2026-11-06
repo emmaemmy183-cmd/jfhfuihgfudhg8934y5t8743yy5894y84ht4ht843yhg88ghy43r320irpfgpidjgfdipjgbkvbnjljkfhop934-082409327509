@@ -205,7 +205,7 @@ test('2027.16: Entsperrung zeigt ein verpflichtendes Begründungsfeld statt leer
  openReview('media','11111111-1111-4111-8111-111111111111','approved');
  assert.doesNotMatch(html,/<textarea name="reason"/,'Unabhängige Medien-Freigabe kann ohne Pflichtgrund bleiben');
  const markup=await readFile(new URL('../public/index.html',import.meta.url),'utf8');
- assert.match(markup,/ken16-ui\.css\?v=2027\.(?:1[6-9]|2[0-2])\.0/);
+ assert.match(markup,/ken16-ui\.css\?v=2027\.(?:1[6-9]|2[0-3])\.0/);
 });
 
 test('2027.16: fehlender Entsperrungsgrund wird auf Deutsch abgelehnt; erfolgreicher Grund wird auditiert',async()=>{

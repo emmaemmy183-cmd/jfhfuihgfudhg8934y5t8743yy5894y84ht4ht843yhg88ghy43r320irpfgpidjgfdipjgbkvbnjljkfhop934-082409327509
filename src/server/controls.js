@@ -225,6 +225,21 @@ export async function controls(req,env,user){
   else{const n=await one(env,'SELECT COUNT(*) AS n FROM profile_labels WHERE user_id=?',[target]);if(Number(n?.n)>=5)throwHttp(400,'Maximal fünf Labels je Konto.');await main(env,'INSERT OR REPLACE INTO profile_labels(user_id,label,color,granted_by) VALUES(?,?,?,?)',[target,label,color,user.id]);}
   await log(env,user.id,'label_'+d.action,target,label);return out({ok:true});
  }
+ // Account suspension appeals are stored in account_states, not social_appeals.
+ // The dedicated endpoint makes them visible in the central appeal queue without
+ // exposing sensitive suspension details to staff lacking account.suspend rights.
+ if(method==='GET'&&path==='/api/admin/appeals'){
+  await need(env,user,'account.suspend');
+  const rows=(await main(env,`SELECT s.user_id AS userId,u.username,p.display_name AS name,
+      s.rule_id AS ruleId,s.reason AS suspensionReason,
+      s.appeal_reason AS appealReason,s.appealed_at AS appealedAt,
+      s.suspended_at AS suspendedAt
+    FROM account_states s JOIN users u ON u.id=s.user_id
+    JOIN profiles p ON p.user_id=s.user_id
+    WHERE s.appeal_status='open' AND u.is_banned=1
+    ORDER BY s.appealed_at ASC LIMIT 75`)).rows;
+  return out({appeals:rows});
+ }
  if(method==='GET'&&path==='/api/admin/suspensions'){
   await need(env,user,'account.suspend');const rows=(await main(env,`SELECT s.user_id AS userId,u.username,s.reason,s.rule_id AS ruleId,s.grace_until AS graceUntil,s.appeal_status AS appealStatus,s.appeal_reason AS appealReason,s.suspended_at AS suspendedAt
  FROM account_states s JOIN users u ON u.id=s.user_id WHERE u.is_banned=1 ORDER BY s.suspended_at DESC LIMIT 50`)).rows;return out({cases:rows});

@@ -96,8 +96,42 @@ test('Kontosperre: Begründung, Einspruch, Wiederherstellung',async()=>{
   r=await call(env,'/account/suspension','GET',null,cb);assert.equal((await r.json()).suspended,true);
   r=await call(env,'/social/feed','GET',null,cb);assert.equal(r.status,403);
   r=await call(env,'/account/appeal','POST',{reason:'Bitte erneut prüfen, es handelt sich um ein Missverständnis.'},cb);assert.equal(r.status,200);
+  // Regression: the Team > Einsprüche tab must see suspension appeals,
+  // not just social_appeals for posts and other content.
+  r=await call(env,'/admin/appeals','GET',null,ca);assert.equal(r.status,200);
+  const teamAppeals=(await r.json()).appeals;
+  assert.equal(teamAppeals.length,1);
+  assert.equal(teamAppeals[0].userId,ub.id);
+  assert.match(teamAppeals[0].appealReason,/Missverständnis/);
+  r=await call(env,'/admin/appeals','GET',null,cb);assert.equal(r.status,403);
   r=await call(env,'/admin/appeals/review','POST',{userId:ub.id,decision:'accepted',reason:'Manuelle Prüfung ergab einen Fehlalarm'},ca);assert.equal(r.status,200);
+  r=await call(env,'/admin/appeals','GET',null,ca);assert.deepEqual((await r.json()).appeals,[]);
   r=await call(env,'/account/suspension','GET',null,cb);assert.equal((await r.json()).suspended,false);
+ }finally{globalThis.fetch=old;main.close();media.close();}
+});
+test('Team-Queue: einzelner Reiter vermeidet andere schwere Moderationsabfragen',async()=>{
+ const {env,fakeFetch,main,media}=await createFakeTurso(),old=globalThis.fetch;
+ const sql=[];
+ globalThis.fetch=async(url,init)=>{
+  if(String(url).includes('main.test')){
+   const payload=JSON.parse(init.body);
+   for(const request of payload.requests||[])if(request.stmt?.sql)sql.push(request.stmt.sql);
+  }
+  return fakeFetch(url,init);
+ };
+ try{
+  const response=await call(env,'/auth/register','POST',register('Owner','queueowner@local.test'));
+  const cookie=response.headers.get('set-cookie').split(';')[0];
+  const me=(await(await call(env,'/me','GET',null,cookie)).json()).user;
+  main.prepare("INSERT INTO team_members(user_id,role) VALUES(?,'owner')").run(me.id);
+  sql.length=0;
+  const queue=await call(env,'/social/admin/queue?scope=appeals','GET',null,cookie);
+  assert.equal(queue.status,200);
+  assert.deepEqual((await queue.json()).appeals,[]);
+  assert.ok(sql.some(q=>/FROM social_appeals/i.test(q)));
+  assert.ok(!sql.some(q=>/FROM social_media m|FROM social_reports WHERE|FROM content_reviews cr/i.test(q)));
+  const invalid=await call(env,'/social/admin/queue?scope=unknown','GET',null,cookie);
+  assert.equal(invalid.status,400);
  }finally{globalThis.fetch=old;main.close();media.close();}
 });
 test('Ungelesene DM-Benachrichtigungen werden nur beim erstmaligen Öffnen geschrieben',async()=>{

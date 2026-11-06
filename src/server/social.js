@@ -459,11 +459,30 @@ export async function socialRoutes(req,env,user){const url=new URL(req.url),path
   await main(env,"UPDATE social_threads SET status='accepted' WHERE id=?",[id]);return output({ok:true});
  }
  if(method==='GET'&&path==='/api/social/admin/queue'){
-  if(!await allowed(env,user,'media.review')&&!await allowed(env,user,'reports.review'))err(403,'Team permission required');
-  const mediaRows=(await main(env,`SELECT m.id,m.kind,m.mime,m.status,m.created_at AS createdAt,u.username,p.display_name AS name,COALESCE(sp.caption,st.body,'') AS caption FROM social_media m JOIN users u ON u.id=m.user_id JOIN profiles p ON p.user_id=u.id LEFT JOIN social_posts sp ON sp.media_id=m.id LEFT JOIN social_stories st ON st.media_id=m.id WHERE m.status='pending' ORDER BY m.created_at ASC LIMIT 70`)).rows;
-  const reports=(await main(env,"SELECT * FROM social_reports WHERE status='open' ORDER BY created_at DESC LIMIT 70")).rows;
-  const appeals=(await main(env,"SELECT * FROM social_appeals WHERE status='open' ORDER BY created_at ASC LIMIT 70")).rows;
-  const content=(await main(env,`SELECT cr.content_type AS type,cr.content_id AS id,cr.created_at AS createdAt, u.username,
+  const scope=String(url.searchParams.get('scope')||'all');
+  if(!['all','media','texts','reports','appeals'].includes(scope))err(400,'Unbekannter Team-Bereich.');
+  // Do not fetch every moderation table when the UI only needs one category.
+  const [mayMedia,mayReports]=await Promise.all([
+   ['all','media','texts'].includes(scope)?allowed(env,user,'media.review'):Promise.resolve(false),
+   ['all','reports','appeals'].includes(scope)?allowed(env,user,'reports.review'):Promise.resolve(false)
+  ]);
+  if(scope==='media'||scope==='texts'){
+   if(!mayMedia)err(403,'Keine Berechtigung für die Medienprüfung.');
+  }else if(scope==='reports'||scope==='appeals'){
+   if(!mayReports)err(403,'Keine Berechtigung für Meldungen und Einsprüche.');
+  }else if(!mayMedia&&!mayReports)err(403,'Team-Berechtigung benötigt.');
+  const result={media:[],content:[],reports:[],appeals:[],pendingCount:0};
+  if((scope==='all'||scope==='media')&&mayMedia){
+   result.media=(await main(env,`SELECT m.id,m.kind,m.mime,m.status,m.created_at AS createdAt,u.username,p.display_name AS name,COALESCE(sp.caption,st.body,'') AS caption FROM social_media m JOIN users u ON u.id=m.user_id JOIN profiles p ON p.user_id=u.id LEFT JOIN social_posts sp ON sp.media_id=m.id LEFT JOIN social_stories st ON st.media_id=m.id WHERE m.status='pending' ORDER BY m.created_at ASC LIMIT 70`)).rows;
+  }
+  if((scope==='all'||scope==='reports')&&mayReports){
+   result.reports=(await main(env,"SELECT * FROM social_reports WHERE status='open' ORDER BY created_at DESC LIMIT 70")).rows;
+  }
+  if((scope==='all'||scope==='appeals')&&mayReports){
+   result.appeals=(await main(env,"SELECT * FROM social_appeals WHERE status='open' ORDER BY created_at ASC LIMIT 70")).rows;
+  }
+  if((scope==='all'||scope==='texts')&&mayMedia){
+   result.content=(await main(env,`SELECT cr.content_type AS type,cr.content_id AS id,cr.created_at AS createdAt, u.username,
      COALESCE(p.caption,s.body,c.body,'') AS body,cr.reason AS policyReason
      FROM content_reviews cr JOIN users u ON u.id=cr.user_id
      LEFT JOIN social_posts p ON cr.content_type='post' AND p.id=cr.content_id
@@ -471,8 +490,9 @@ export async function socialRoutes(req,env,user){const url=new URL(req.url),path
      LEFT JOIN social_comments c ON cr.content_type='comment' AND c.id=cr.content_id
      WHERE cr.status='pending' AND ((cr.content_type='post' AND p.media_id IS NULL) OR (cr.content_type='story' AND s.media_id IS NULL) OR cr.content_type='comment')
      ORDER BY cr.created_at ASC LIMIT 100`)).rows;
-  const pendingCount=Number((await one(env,"SELECT COUNT(*) AS n FROM content_reviews WHERE status='pending'"))?.n||0);
-  return output({media:mediaRows,content,reports,appeals,pendingCount});
+   result.pendingCount=Number((await one(env,"SELECT COUNT(*) AS n FROM content_reviews WHERE status='pending'"))?.n||0);
+  }
+  return output(result);
  }
  if(method==='GET'&&path==='/api/social/admin/staff'){
   await staff(env,user);const staffMembers=(await main(env,`SELECT u.id,p.display_name AS name,t.role FROM team_members t JOIN users u ON u.id=t.user_id JOIN profiles p ON p.user_id=u.id WHERE u.is_banned=0 AND t.role IN ('moderator','manager','admin','owner') ORDER BY p.display_name LIMIT 100`)).rows;

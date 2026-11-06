@@ -1,3 +1,5 @@
+> **Neu: Kennely 2027.23 – Einsprüche im Team korrekt angezeigt und weniger Turso-Abfragen.** Siehe [UPDATE_2027_23_RENDER.md](UPDATE_2027_23_RENDER.md).
+
 # Kennely 2027.22 – Vollständige Render-Version
 
 **Aktuelle Anleitung:** [`UPDATE_2027_22_RENDER.md`](UPDATE_2027_22_RENDER.md). Dieses Paket enthält die vollständige Website, Render-Node-Server, Turso-Skripte, Support, Moderation und SEO-Seiten.

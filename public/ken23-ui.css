@@ -1,0 +1,7 @@
+/* Kennely 2027.23 – concise appeal queue layout, responsive moderation actions */
+.kn-appeal-item{align-items:flex-start;gap:1rem}
+.kn-appeal-item>div:first-child{min-width:0;flex:1}
+.kn-appeal-item small{display:block;margin:.35rem 0;opacity:.72}
+.kn-appeal-item blockquote{margin:.7rem 0;padding:.7rem .9rem;border-left:3px solid #9754ef;white-space:pre-wrap;overflow-wrap:anywhere;background:rgba(142,79,238,.08);border-radius:.4rem}
+.kn-appeal-item .review-actions{display:flex;gap:.5rem;flex-wrap:wrap;align-items:flex-start}
+@media (max-width:680px){.kn-appeal-item{display:flex;flex-direction:column}.kn-appeal-item .review-actions{width:100%}.kn-appeal-item .review-actions button{min-height:44px;flex:1 1 140px}}
