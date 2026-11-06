@@ -22,7 +22,8 @@ async function mentionNotify(env,text,author,kind){
 function validStoryStyle(input){
  const raw=input&&typeof input==='object'&&!Array.isArray(input)?input:{};
  const n=(v,min,max,def)=>Number.isFinite(Number(v))?Math.round(Math.min(max,Math.max(min,Number(v)))):def;
- return JSON.stringify({x:n(raw.x,12,88,50),y:n(raw.y,12,88,50),size:n(raw.size,18,42,28),color:/^#[0-9a-f]{6}$/i.test(raw.color||'')?raw.color:'#ffffff',align:['left','center','right'].includes(raw.align)?raw.align:'center'});
+ const style={x:n(raw.x,12,88,50),y:n(raw.y,12,88,50),size:n(raw.size,18,42,28),color:/^#[0-9a-f]{6}$/i.test(raw.color||'')?raw.color:'#ffffff',align:['left','center','right'].includes(raw.align)?raw.align:'center'};
+ if(raw.zoom!==undefined)style.zoom=n(raw.zoom,100,200,100);return JSON.stringify(style);
 }
 async function hasPrivateGrant(env,actor,targetId){return !!await one(env,`SELECT 1 AS ok FROM staff_private_review_access WHERE actor_id=? AND target_id=? AND expires_at>CURRENT_TIMESTAMP`,[actor,targetId]);}
 async function blocked(env,a,b){return !!await one(env,'SELECT 1 AS found FROM blocks WHERE (blocker_id=? AND blocked_id=?) OR (blocker_id=? AND blocked_id=?)',[a,b,b,a]);}
@@ -231,14 +232,15 @@ export async function socialRoutes(req,env,user){const url=new URL(req.url),path
   }
   const predicate=kind==='followers'?'f.following_id=?':'f.follower_id=?';
   const match=kind==='followers'?'f.follower_id':'f.following_id';
-  const people=(await main(env,`SELECT u.id,u.username,p.display_name AS name,
+  const offset=Math.min(5000,Math.max(0,Number.parseInt(new URL(req.url).searchParams.get('offset')||'0',10)||0));
+  const peoplePlus=(await main(env,`SELECT u.id,u.username,p.display_name AS name,
     (SELECT 1 FROM official_accounts o WHERE o.user_id=u.id) AS official,
     (SELECT ph.id FROM photos ph WHERE ph.user_id=u.id AND ph.status='approved' ORDER BY ph.created_at DESC LIMIT 1) AS photoId
     FROM social_follows f JOIN users u ON u.id=${match} JOIN profiles p ON p.user_id=u.id
     WHERE ${predicate} AND u.is_banned=0 AND p.visible=1 AND NOT EXISTS(SELECT 1 FROM blocks b
     WHERE (b.blocker_id=? AND b.blocked_id=u.id) OR (b.blocked_id=? AND b.blocker_id=u.id))
-    ORDER BY f.created_at DESC LIMIT 100`,[id,user.id,user.id])).rows;
-  return output({people,kind});
+    ORDER BY f.created_at DESC, u.id DESC LIMIT 61 OFFSET ?`,[id,user.id,user.id,offset])).rows;
+  return output({people:peoplePlus.slice(0,60),kind,hasMore:peoplePlus.length>60,nextOffset:offset+60});
  }
  if(method==='GET'&&path.startsWith('/api/social/profiles/')){
   const id=idGuard(path.slice('/api/social/profiles/'.length)),p=await target(env,id);

@@ -1,0 +1,56 @@
+/* Kennely 2027.20 — responsive Instagram-inspired interactions in Kennely identity. */
+:root{--kn-feedback:#f12b51;--kn-follow-ink:#16131d}
+html{overscroll-behavior-y:auto}
+button,a,input,select,textarea{touch-action:manipulation}
+@media(max-width:760px){input,textarea,select{font-size:max(16px,1rem)!important}}
+/* Like feedback is immediate. Both stroke and fill change together. */
+[data-like].active{color:var(--kn-feedback)!important}
+[data-like].active svg.icon,[data-like].active svg.icon use{fill:var(--kn-feedback)!important;stroke:var(--kn-feedback)!important}
+[data-like]:active,[data-follow]:active,[data-comment-like]:active{transform:scale(.96)}
+[data-like],[data-follow],[data-comment-like]{transition:color .1s ease,background-color .1s ease,transform .12s ease}
+[data-follow].kn-unfollow{background:#faf9fc!important;color:#18141b!important;border:1px solid #e9e6ed!important;box-shadow:none!important;font-weight:800}
+[data-follow].kn-follow-requested{background:var(--surface2)!important;color:var(--text)!important;border:1px solid var(--line)!important}
+.kn-private-request-notice{font-size:13px;font-weight:650;color:var(--muted);background:var(--surface2);padding:12px 15px;border-radius:13px;margin:8px 0 0}
+/* Profiles navigate through history without document refresh, skeleton is rendered instantly. */
+.kn-profile-loading{min-height:240px;width:min(100%,900px);display:flex;align-items:center;gap:22px;padding:26px 20px}
+.kn-profile-loading>div:last-child{flex:1;display:grid;gap:14px}
+.kn-skeleton{background:linear-gradient(110deg,var(--surface2) 8%,color-mix(in srgb,var(--accent) 13%,var(--surface2)) 20%,var(--surface2) 34%);background-size:220% 100%;border-radius:12px;animation:kn-pulse 1.6s linear infinite}
+.kn-skeleton-avatar{width:100px;height:100px;border-radius:50%}.kn-skeleton-title{width:55%;height:27px}.kn-skeleton-line{width:90%;height:17px}.kn-skeleton-line:last-child{width:64%}
+@keyframes kn-pulse{to{background-position-x:-220%}}
+/* Followers / following: stable scroll body, compact row actions, no overlay jank. */
+#modal:has(.kn-follow-modal){width:min(92vw,560px)!important;max-width:560px;max-height:min(86dvh,830px)!important;overflow:hidden}
+#modal:has(.kn-follow-modal) .modal-shell{padding:0!important;max-height:80dvh!important;overflow:hidden!important}
+#modal:has(.kn-follow-modal) #closeModal{z-index:5;right:10px;top:10px}
+.kn-follow-modal{width:100%;min-width:0;max-height:min(80dvh,750px);display:flex;flex-direction:column;overflow:hidden}
+.kn-follow-modal h2{flex:none;font-size:18px;margin:0!important;text-align:center;padding:21px 50px;border-bottom:1px solid var(--line)}
+.kn-follow-list{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:11px 17px 20px;scrollbar-gutter:stable}
+.kn-follow-row{display:flex;align-items:center;gap:12px;min-height:67px;padding:8px 5px}
+.kn-follow-person{background:transparent;border:0;display:flex;align-items:center;gap:11px;flex:1;min-width:0;text-align:left;color:var(--text)}
+.kn-follow-person .avatar{width:43px;height:43px;flex-shrink:0}
+.kn-follow-person span:not(.avatar){display:flex;flex-direction:column;gap:4px;overflow:hidden}
+.kn-follow-person strong,.kn-follow-person small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kn-follow-person small{font-size:11px;color:var(--muted)}
+.kn-follow-open{border:1px solid color-mix(in srgb,var(--accent) 35%,var(--line));background:var(--accent);color:white;font-weight:750;border-radius:10px;padding:9px 10px;font-size:12px;white-space:nowrap}
+.kn-follow-private{padding:16px 22px;color:var(--muted)}
+/* Saved / activity results are gallery tiles, not huge feed articles. */
+.kn-activity-tabs{display:flex;gap:10px;align-items:center;margin:0 0 15px;border-bottom:1px solid var(--line);padding-bottom:8px}
+.kn-activity-tabs>*{font-size:13px;font-weight:750;border:0;background:transparent;color:var(--muted);padding:10px 12px;border-radius:9px}
+.kn-activity-tabs .active{color:var(--text);background:var(--surface2)}
+.kn-collection-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px;max-width:1050px;width:100%}
+.kn-collection-grid .kn-discover-tile{min-width:0;aspect-ratio:1/1.1;max-height:300px}
+.kn-collection-grid .kn-discover-tile img{width:100%;height:100%;object-fit:cover}
+/* Story editor: drag overlay independently, zoom photos within existing 640KB compression budget. */
+#knStoryOverlay{pointer-events:auto!important;touch-action:none;cursor:grab;user-select:none;max-width:85%}
+#knStoryOverlay:active{cursor:grabbing}
+#knStoryOverlay:focus-visible{outline:3px solid #fff;outline-offset:8px}
+#knStoryImage{transform-origin:center center;will-change:transform;pointer-events:none}
+.kn-story-hint{background:var(--surface2);padding:12px;border-radius:9px;line-height:1.35;font-weight:500;color:var(--text)}
+@media(max-width:760px){.kn-collection-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:2px}.kn-profile-loading{gap:15px}.kn-skeleton-avatar{width:75px;height:75px}.kn-follow-modal{max-height:80dvh}.kn-follow-open{font-size:11px;padding:9px 8px}}
+@media(prefers-reduced-motion:reduce){.kn-skeleton{animation:none}[data-like],[data-follow],[data-comment-like]{transition:none}}
+
+.kn-follow-more{flex:none;border:0;border-top:1px solid var(--line);padding:15px;background:var(--surface);color:var(--accent);font-weight:800;cursor:pointer}.kn-follow-more:disabled{opacity:.7;cursor:wait}
+
+/* Give collection gallery pages room instead of rendering an empty right rail. */
+body[data-view=saved] .right-rail,body[data-view=activity] .right-rail{display:none!important}
+@media(min-width:761px){body[data-view=saved] .content,body[data-view=activity] .content{width:min(100%,1050px)!important}body[data-view=saved] .workarea,body[data-view=activity] .workarea{padding-inline:clamp(22px,3vw,55px)}}
+#knStoryCanvas{touch-action:none}

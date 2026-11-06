@@ -1,3 +1,7 @@
+# Neueste Version: Kennely 2027.20
+
+Bitte zuerst [`UPDATE_2027_20.md`](UPDATE_2027_20.md) beachten.
+
 > **Neue Version 2027.13:** Bitte zuerst [UPDATE_2027_13.md](UPDATE_2027_13.md) lesen.
 
 # Kennely 2027.12 installieren und veröffentlichen

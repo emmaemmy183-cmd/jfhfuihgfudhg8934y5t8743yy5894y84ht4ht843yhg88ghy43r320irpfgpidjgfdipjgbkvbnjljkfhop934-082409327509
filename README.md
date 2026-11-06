@@ -1,3 +1,7 @@
+# Kennely 2027.20 · Vollständiges Netlify-Projekt
+
+Neue Hinweise: [UPDATE_2027_20.md](UPDATE_2027_20.md)
+
 # Kennely 2027.19 – vollständige Foto-Plattform (Netlify / Turso)
 
 **Neueste Anleitung: [`UPDATE_2027_19.md`](UPDATE_2027_19.md).** Dieses ZIP ist das komplette Repository, kein reiner Patch. Es basiert auf Kennely 2027.18.

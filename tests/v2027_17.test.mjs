@@ -33,6 +33,6 @@ test('2027.17: Entdecken ist Fotokachelansicht ohne Reel-Navigation',async()=>{
  assert.match(src,/function exploreCard\(p\)/);
  assert.match(src,/kn-discover-grid/);
  assert.match(css,/\.kn-discover-grid/);
- assert.match(html,/ken17-ui\.css\?v=2027\.19\.0/);
+ assert.match(html,/ken17-ui\.css\?v=2027\.(?:19|20)\.0/);
  assert.doesNotMatch(src,/\['reels','/);
 });

@@ -1,6 +1,6 @@
 {
   "name": "kennely",
-  "version": "2027.19.0",
+  "version": "2027.20.0",
   "private": true,
   "type": "module",
   "description": "Kennely Social DE ab 16: Netlify Functions, Turso, Fotos, Stories und Nachrichten",
