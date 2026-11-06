@@ -184,3 +184,51 @@ test('2027.13: legacy CEO account can set a missing username through own setting
   assert.equal(me.username,'chefkennely2027');assert.equal(me.role,'owner');
  }finally{globalThis.fetch=old;main.close();media.close();}
 });
+
+test('2027.16: Entsperrung zeigt ein verpflichtendes Begründungsfeld statt leeren Dialog',async()=>{
+ const script=await readFile(new URL('../public/social-app.js',import.meta.url),'utf8');
+ const start=script.indexOf('function openReview('),end=script.indexOf('function authModal(',start);
+ assert.ok(start>0&&end>start,'Review-Dialog muss vorhanden sein');
+ const code=script.slice(start,end);
+ const esc=s=>String(s).replace(/[&<>"']/g,'');
+ let html='';
+ const openReview=new Function('tr','esc','openModal',code+'return openReview;')(key=>({moderationReason:'Begründung der Entscheidung',reason:'Grund',teamRoles:'Mitarbeiterrollen'}[key]||key),esc,body=>{html=body;});
+ for(const status of ['unban','ban','warning','restrict']){
+  openReview('user','11111111-1111-4111-8111-111111111111',status);
+  assert.match(html,/name="reason"[^>]+minlength="8"[^>]+required/,'Kontomoderation benötigt dokumentierten Grund');
+  assert.match(html,/name="reason"/);
+  assert.match(html,/required/);
+ }
+ openReview('user','11111111-1111-4111-8111-111111111111','unban');
+ assert.match(html,/Entsperrung bestätigen/);
+ assert.match(html,/Begründung für die Entsperrung/);
+ openReview('media','11111111-1111-4111-8111-111111111111','approved');
+ assert.doesNotMatch(html,/<textarea name="reason"/,'Unabhängige Medien-Freigabe kann ohne Pflichtgrund bleiben');
+ const markup=await readFile(new URL('../public/index.html',import.meta.url),'utf8');
+ assert.match(markup,/ken16-ui\.css\?v=2027\.1[6-9]\.0/);
+});
+
+test('2027.16: fehlender Entsperrungsgrund wird auf Deutsch abgelehnt; erfolgreicher Grund wird auditiert',async()=>{
+ const {env,fakeFetch,main,media}=await createFakeTurso(),old=globalThis.fetch;globalThis.fetch=fakeFetch;
+ try{
+  let r=await call(env,'/auth/register','POST',register('Owner','moderatorowner@local.test'));
+  assert.equal(r.status,201,await r.text());const co=r.headers.get('set-cookie').split(';')[0];
+  const owner=(await(await call(env,'/me','GET',null,co)).json()).user;
+  r=await call(env,'/auth/register','POST',register('Member','moderateduser@local.test'));
+  assert.equal(r.status,201,await r.text());const member=(await(await call(env,'/me','GET',null,r.headers.get('set-cookie').split(';')[0])).json()).user;
+  main.prepare("INSERT INTO team_members(user_id,role) VALUES(?,'owner')").run(owner.id);
+  r=await call(env,'/admin/moderate','POST',{userId:member.id,action:'ban',reason:'Testregel mehrfach verletzt'},co);
+  assert.equal(r.status,200,await r.text());
+  assert.equal(main.prepare('SELECT is_banned FROM users WHERE id=?').get(member.id).is_banned,1);
+  r=await call(env,'/admin/moderate','POST',{userId:member.id,action:'unban',reason:''},co);
+  assert.equal(r.status,400);
+  assert.match((await r.json()).error,/Begründung/);
+  assert.equal(main.prepare('SELECT is_banned FROM users WHERE id=?').get(member.id).is_banned,1);
+  r=await call(env,'/admin/moderate','POST',{userId:member.id,action:'unban',reason:'Nach Prüfung der Beschwerde aufgehoben'},co);
+  assert.equal(r.status,200,await r.text());
+  assert.equal(main.prepare('SELECT is_banned FROM users WHERE id=?').get(member.id).is_banned,0);
+  const audit=main.prepare("SELECT action,details FROM admin_audit WHERE target_id=? AND action='account_reinstated' ORDER BY created_at DESC LIMIT 1").get(member.id);
+  assert.ok(audit,'Entsperrung muss auditiert werden');
+  assert.match(audit.details,/Nach Prüfung/);
+ }finally{globalThis.fetch=old;main.close();media.close();}
+});

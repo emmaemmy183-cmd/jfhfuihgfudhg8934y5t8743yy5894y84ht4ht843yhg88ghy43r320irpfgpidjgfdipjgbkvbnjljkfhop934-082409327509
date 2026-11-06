@@ -1,0 +1,43 @@
+/* Kennely 2027.17: photo-first responsive interface; no video/reels views. */
+:root { --kn-violet:#8c4ff8; --kn-deep:#0b0c13; }
+body.kn-suspended {background:var(--kn-deep);}
+body.kn-suspended .sidebar,body.kn-suspended .mobile-top,body.kn-suspended .mobile-nav,body.kn-suspended .right-rail,body.kn-suspended #rightRail{display:none!important}
+body.kn-suspended .shell,body.kn-suspended .workarea,body.kn-suspended #content{width:100%;max-width:none;min-width:0;margin:0;padding:0;display:block}
+.kn-ban-page{min-height:100dvh;color:#f7f5fd;background:radial-gradient(ellipse at 50% -20%,rgba(107,55,201,.18),transparent 55%),#0b0c13;font-size:16px}
+.kn-ban-head{min-height:82px;max-width:920px;margin:auto;padding:20px clamp(20px,5vw,48px);display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #272334;color:#b4aec8;font-size:13px}
+.kn-ban-brand{display:flex;align-items:center;gap:10px;font-size:24px;font-weight:850;letter-spacing:-1px;color:#fff;text-decoration:none}.kn-ban-brand img{width:35px;height:35px;border-radius:10px}.kn-ban-brand span{color:#ad67f6}
+.kn-ban-content{max-width:710px;margin:0 auto;padding:48px 23px 72px;display:flex;flex-direction:column;align-items:stretch;gap:0}.kn-ban-avatar{display:grid;place-items:center;margin:0 0 22px}.kn-ban-avatar .avatar{width:94px;height:94px;border:3px solid #383044}.kn-ban-avatar img{width:100%;height:100%;object-fit:cover}
+.kn-ban-content>h1{text-align:center;font-size:clamp(30px,6vw,44px);max-width:550px;align-self:center;line-height:1.14;letter-spacing:-.045em;margin:0 0 12px}
+.kn-ban-subtitle,.kn-ban-date{text-align:center;color:#bbb6c5;margin:0 0 8px}.kn-ban-date{font-size:14px;color:#898698;margin-bottom:35px}
+.kn-ban-section{padding:23px 0;border-top:1px solid #282633}.kn-ban-section h2,.kn-ban-appeal h2{font-size:20px;font-weight:750;margin:0 0 13px}.kn-ban-section p,.kn-ban-appeal p,.kn-ban-message p{line-height:1.65;margin:0 0 12px;color:#dedbe6}.kn-ban-section .kn-ban-muted{color:#aaa5b6;font-size:14px}
+.kn-ban-section a,.kn-ban-links a{color:#bc90ff;text-decoration:none}.kn-ban-links{display:flex;flex-wrap:wrap;gap:20px;margin-top:15px}
+.kn-ban-appeal,.kn-ban-message{background:#171522;border:1px solid #393146;border-radius:21px;padding:24px;margin:12px 0 25px}.kn-ban-appeal textarea{min-height:145px;resize:vertical}.kn-ban-appeal .button{min-height:49px}.kn-ban-appeal label{display:grid;gap:8px}.kn-ban-message strong{font-size:18px}.kn-ban-logout{margin-top:16px;width:100%;min-height:50px}.kn-ban-loading{text-align:center;padding:30px;color:#ccc}
+.kn-discover-grid{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px;max-width:900px;margin:0 auto;align-items:start}.kn-discover-tile{position:relative;display:block;aspect-ratio:1 / 1;min-width:0;border:0;border-radius:2px;padding:0;overflow:hidden;background:#1e1b2a;color:#fff;cursor:pointer;text-align:left}.kn-discover-tile img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .22s ease}.kn-discover-tile:hover img{transform:scale(1.035)}.kn-discover-tile>span:not(.kn-discover-caption){display:block;padding:14px;overflow:hidden;overflow-wrap:anywhere;font-size:clamp(12px,2vw,20px)}.kn-discover-caption{position:absolute;bottom:0;left:0;right:0;padding:22px 10px 9px;background:linear-gradient(transparent,#1119);font-size:12px;font-weight:700}
+.explore-search{margin:0 0 14px;padding:0;background:transparent;border:none}.explore-search .field{margin:0}.explore-search input.search-input{width:100%;min-height:52px;border-radius:19px;background:#22202d;border:1px solid #333041;padding:12px 17px;font-size:16px}
+.profile-top{align-items:start}.profile-stats button{cursor:pointer}.profile-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px}.profile-grid button{border-radius:2px;aspect-ratio:1;overflow:hidden}.profile-grid button img{height:100%;width:100%;object-fit:cover}.profile-title p{overflow-wrap:anywhere}
+.post-photo{object-fit:contain!important;max-height:min(75dvh,900px);background:#090910}.post-image-open{background:#090910;display:block;width:100%}
+#modal .modal-shell,#menuDrawer{overscroll-behavior:contain}.menu-drawer{overflow-y:auto!important;height:100dvh!important;max-height:100dvh!important}
+@media(max-width:680px){
+ .kn-ban-head{min-height:70px;padding:16px 20px}.kn-ban-content{padding:35px 21px 54px}.kn-ban-section{padding:22px 0}.kn-ban-appeal{padding:19px 17px}.kn-ban-content>h1{font-size:32px}
+ .kn-discover-grid{gap:2px}.kn-discover-caption{padding:15px 6px 6px;font-size:11px}
+ .profile-top{gap:14px}.profile-stats{gap:10px}.profile-title .split-actions{flex-wrap:wrap}.profile-title .split-actions .button{min-height:42px}
+ .mobile-nav{padding-bottom:max(6px,env(safe-area-inset-bottom))}.mobile-nav .nav-item{min-width:0}
+}
+@media(max-width:350px){.kn-ban-content>h1{font-size:27px}.kn-ban-page{font-size:15px}.kn-ban-section h2{font-size:18px}}
+@media(prefers-reduced-motion:reduce){.kn-discover-tile img{transition:none}}
+/* Comment sheet on mobile, kept keyboard-accessible. */
+#modal:has(.comment-dialog){padding:0;}
+#modal:has(.comment-dialog) .modal-shell{width:min(740px,100%);display:flex;flex-direction:column;min-height:min(690px,85dvh);max-height:90dvh;padding:58px 24px 20px!important;overflow:hidden}
+#modal:has(.comment-dialog) #modalBody{display:flex;flex-direction:column;flex:1;min-height:0}
+.comment-dialog{display:flex;flex-direction:column;min-height:0;height:100%}
+.comment-dialog h2{text-align:center;margin:0 0 6px}.comment-dialog>p.tiny{text-align:center;color:#a7a1b9}
+.comment-dialog .comment-list{flex:1;overflow-y:auto;min-height:140px;overscroll-behavior:contain;scrollbar-width:thin}
+.comment-dialog .comment-compose{padding-top:12px;border-top:1px solid #363044;flex-shrink:0}
+.comment-dialog .comment-compose input{min-width:0;border-radius:24px}
+@media(max-width:680px){
+ #modal:has(.comment-dialog){position:fixed;top:auto;bottom:0;left:0;right:0;margin:0;width:100%;max-width:100vw;max-height:90dvh;border-radius:28px 28px 0 0;border-bottom:0}
+ #modal:has(.comment-dialog)::backdrop{background:rgba(0,0,0,.68)}
+ #modal:has(.comment-dialog) .modal-shell{max-height:90dvh;height:min(77dvh,720px);padding:57px 15px max(18px,env(safe-area-inset-bottom))!important}
+ #modal:has(.comment-dialog) .modal-shell:before{content:"";position:absolute;top:11px;left:50%;transform:translateX(-50%);height:4px;width:46px;background:#777080;border-radius:10px}
+ #modal:has(.comment-dialog) .comment-dialog h2{font-size:21px}
+}

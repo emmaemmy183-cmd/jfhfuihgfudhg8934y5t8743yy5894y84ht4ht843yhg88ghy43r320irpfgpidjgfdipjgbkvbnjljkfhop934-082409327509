@@ -169,7 +169,7 @@ export async function features(req,env,user){const url=new URL(req.url),p=url.pa
  }
  if(m==='POST'&&p==='/api/admin/moderate'){
   requireStaff(user,'moderator');const d=await data(req),target=guardId(d.userId),action=String(d.action||''),reason=clean(d.reason,500);
-  if(reason.length<8)fail(400,'A reason is required.');await userExists(env,target);
+  if(reason.length<8)fail(400,'Bitte gib eine Begründung mit mindestens 8 Zeichen ein.');await userExists(env,target);
   const role=await getRole(env,target);if(roleLevel(role)>=roleLevel(user.role))fail(403,'Cannot moderate equal or higher team roles.');
   if(action==='warning'){
    await main(env,'INSERT INTO moderation_warnings(id,target_id,actor_id,reason) VALUES(?,?,?,?)',[uid(),target,user.id,reason]);

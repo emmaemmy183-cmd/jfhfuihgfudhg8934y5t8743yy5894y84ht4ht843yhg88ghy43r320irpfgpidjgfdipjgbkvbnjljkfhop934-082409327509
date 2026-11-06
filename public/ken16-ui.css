@@ -1,0 +1,47 @@
+/* Kennely 2027.16 – moderation modal layout and accessibility fixes. */
+#modal .modal-shell {
+  box-sizing:border-box;
+  min-width:0;
+  padding:64px 26px 26px !important;
+  max-height:min(85dvh,850px);
+  overflow-y:auto;
+  overscroll-behavior:contain;
+}
+#modal #closeModal {
+  position:absolute;
+  top:10px;
+  right:12px;
+  display:grid;
+  place-items:center;
+  width:44px;
+  height:44px;
+  padding:0;
+  border:1px solid var(--line);
+  border-radius:13px;
+  background:var(--surface2);
+  color:var(--text);
+  cursor:pointer;
+  font-size:29px;
+  font-weight:400;
+  line-height:1;
+  z-index:2;
+  touch-action:manipulation;
+}
+#modal #closeModal:hover,#modal #closeModal:focus-visible {
+  border-color:var(--accent);
+  outline:2px solid transparent;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 25%,transparent);
+}
+#modal #modalBody {min-width:0;overflow-wrap:anywhere;}
+#modal #modalBody>h2 {font-size:clamp(19px,5vw,25px);line-height:1.22;margin:0 0 14px;}
+#modal #modalBody .modal-error {margin:0 0 16px;}
+#modal #reviewForm {display:grid;gap:13px;}
+#modal #reviewForm .field {margin:0;min-width:0;}
+#modal #reviewForm textarea[name="reason"] {min-height:110px;resize:vertical;}
+#modal #reviewForm .field-hint {display:block;line-height:1.4;margin-top:2px;}
+#modal #reviewForm .button {min-height:46px;}
+@media(max-width:480px){
+  #modal{width:min(calc(100vw - 24px),535px);max-height:calc(100dvh - 32px);}
+  #modal .modal-shell {padding:62px 18px 22px !important;max-height:calc(100dvh - 36px);}
+  #modal #modalBody>h2 {font-size:clamp(19px,5.3vw,23px);}
+}

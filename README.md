@@ -1,4 +1,8 @@
-# Kennely 2027.15 – Vollständiges Projekt
+# Kennely 2027.17 – Photo-first Social
+
+**Aktuelle Anleitung:** [UPDATE_2027_17.md](UPDATE_2027_17.md)
+
+# Kennely 2027.16 – Vollständiges Projekt
 
 **Updateanleitung: [UPDATE_2027_15.md](UPDATE_2027_15.md)**
 
@@ -87,3 +91,7 @@ Wortlistenlizenz: [`WORTFILTER_QUELLEN.md`](./WORTFILTER_QUELLEN.md).
 - `db/`: Schemata und additive Migrationen.
 - `scripts/`: Prüf-, Migrations- und Kontoverwaltungsskripte.
 - `tests/`: API- und Regressionstests.
+
+## Hotfix 2027.16
+
+Das Entsperren von Konten fordert jetzt die serverseitig notwendige Begründung an. Der Moderationsdialog wurde für Smartphones überarbeitet, inklusive gut erreichbarer Schließen-Schaltfläche und deutschen Fehlermeldungen. Einzelheiten: `UPDATE_2027_16.md`.

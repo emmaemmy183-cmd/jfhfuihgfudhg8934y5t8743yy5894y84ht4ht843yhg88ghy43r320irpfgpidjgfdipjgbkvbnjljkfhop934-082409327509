@@ -76,3 +76,8 @@
   for = "/ken13-ui.css"
   [headers.values]
     Cache-Control = "no-cache, must-revalidate"
+
+[[headers]]
+  for = "/ken16-ui.css"
+  [headers.values]
+    Cache-Control = "no-cache, must-revalidate"
