@@ -12,6 +12,19 @@ const output=(obj,status=200,extra={})=>new Response(JSON.stringify(obj),{status
 async function body(req,max=9000){if(req.headers.get('content-type')?.split(';')[0]!=='application/json')err(415,'JSON required');const raw=await req.text();if(new TextEncoder().encode(raw).length>max)err(413,'Request too large');try{return JSON.parse(raw);}catch{err(400,'Invalid JSON');}}
 const idGuard=id=>{if(!valid(id))err(400,'Ungültige Kennung');return id;};
 const allowedReason=new Set(['spam','abuse','hate','nudity','copyright','under18','impersonation','illegal','other']);
+const mentionNames=value=>[...new Set((String(value||'').match(/@[a-z0-9._]{10,24}/gi)||[]).map(n=>n.slice(1).toLowerCase()))].slice(0,6);
+async function mentionNotify(env,text,author,kind){
+ for(const name of mentionNames(text)){
+  const member=await one(env,'SELECT id FROM users WHERE username=? COLLATE NOCASE AND is_banned=0',[name]);
+  if(member&&member.id!==author&&!await blocked(env,author,member.id))await notify(env,member.id,'mention',kind==='story'?'Du wurdest in einer Story erwähnt':kind==='post'?'Du wurdest in einem Beitrag erwähnt':'Du wurdest in einem Kommentar erwähnt',`@${name} wurde markiert.`,author);
+ }
+}
+function validStoryStyle(input){
+ const raw=input&&typeof input==='object'&&!Array.isArray(input)?input:{};
+ const n=(v,min,max,def)=>Number.isFinite(Number(v))?Math.round(Math.min(max,Math.max(min,Number(v)))):def;
+ return JSON.stringify({x:n(raw.x,12,88,50),y:n(raw.y,12,88,50),size:n(raw.size,18,42,28),color:/^#[0-9a-f]{6}$/i.test(raw.color||'')?raw.color:'#ffffff',align:['left','center','right'].includes(raw.align)?raw.align:'center'});
+}
+async function hasPrivateGrant(env,actor,targetId){return !!await one(env,`SELECT 1 AS ok FROM staff_private_review_access WHERE actor_id=? AND target_id=? AND expires_at>CURRENT_TIMESTAMP`,[actor,targetId]);}
 async function blocked(env,a,b){return !!await one(env,'SELECT 1 AS found FROM blocks WHERE (blocker_id=? AND blocked_id=?) OR (blocker_id=? AND blocked_id=?)',[a,b,b,a]);}
 async function target(env,id){idGuard(id);const row=await one(env,`SELECT u.id,u.username,p.display_name AS name,p.bio,p.city,p.visible,p.is_private AS isPrivate,u.is_banned,
  (SELECT role FROM team_members t WHERE t.user_id=u.id) AS role,
@@ -23,7 +36,7 @@ async function postVisible(env,id,userId){idGuard(id);const r=await one(env,`SEL
  if(!r||r.status!=='published'||(r.media_id&&r.media_status!=='approved'))err(404,'Beitrag nicht verfügbar');
  if(!await one(env,"SELECT 1 AS ok FROM content_reviews WHERE content_type='post' AND content_id=? AND status='approved'",[id]))err(404,'Beitrag wartet auf Freigabe');
  if(await blocked(env,userId,r.user_id))err(404,'Post not available');
- if((r.visibility==='followers'||(await one(env,'SELECT is_private FROM profiles WHERE user_id=?',[r.user_id]))?.is_private)&&r.user_id!==userId&&!await one(env,'SELECT 1 AS f FROM social_follows WHERE follower_id=? AND following_id=?',[userId,r.user_id]))err(403,'Followers only');
+ if((r.visibility==='followers'||(await one(env,'SELECT is_private FROM profiles WHERE user_id=?',[r.user_id]))?.is_private)&&r.user_id!==userId&&!await one(env,'SELECT 1 AS f FROM social_follows WHERE follower_id=? AND following_id=?',[userId,r.user_id])&&!await hasPrivateGrant(env,userId,r.user_id))err(403,'Followers only');
  return r;}
 function imageType(bytes,mime){const jpg=bytes[0]===255&&bytes[1]===216&&bytes[2]===255;const png=bytes[0]===137&&bytes[1]===80&&bytes[2]===78&&bytes[3]===71;const webp=new TextDecoder().decode(bytes.subarray(0,4))==='RIFF'&&new TextDecoder().decode(bytes.subarray(8,12))==='WEBP';return mime==='image/jpeg'&&jpg||mime==='image/png'&&png||mime==='image/webp'&&webp;}
 async function audit(env,user,action,id,note=''){await main(env,'INSERT INTO admin_audit(id,actor_id,action,target_id,details) VALUES(?,?,?,?,?)',[uid(),user,action,id,note]);}
@@ -40,10 +53,36 @@ const staff=async(env,user,cap='media.review')=>{if(!await allowed(env,user,cap)
 export async function socialRoutes(req,env,user){const url=new URL(req.url),path=url.pathname,method=req.method;
  if(!path.startsWith('/api/social/'))return null;
  const offset=Math.max(0,Math.min(100000,Number(url.searchParams.get('offset'))||0));
+ if(method==='POST'&&path==='/api/social/admin/private-access'){
+  await staff(env,user,'private.profile.review');const d=await body(req),targetId=idGuard(d.userId),reason=clean(d.reason,280);
+  if(reason.length<18)err(400,'Bitte einen konkreten Prüfgrund mit mindestens 18 Zeichen eingeben.');
+  if(targetId===user.id)err(400,'Das eigene Profil benötigt keinen Prüfzugriff.');
+  const person=await target(env,targetId);
+  if(!person.isPrivate)err(400,'Dieses Profil ist bereits öffentlich.');
+  await main(env,`INSERT INTO staff_private_review_access(actor_id,target_id,reason,expires_at)
+  VALUES(?,?,?,datetime('now','+10 minutes'))
+  ON CONFLICT(actor_id,target_id) DO UPDATE SET reason=excluded.reason,expires_at=excluded.expires_at`,[user.id,targetId,reason]);
+  await audit(env,user.id,'private_profile_moderation_access',targetId,reason);
+  return output({ok:true,expiresInMinutes:10});
+ }
+ if(method==='GET'&&path==='/api/social/suggestions'){
+  const people=(await main(env,`SELECT u.id,u.username,p.display_name AS name,
+   (SELECT ph.id FROM photos ph WHERE ph.user_id=u.id AND ph.status='approved' ORDER BY ph.created_at DESC LIMIT 1) AS photoId,
+   (SELECT 1 FROM official_accounts o WHERE o.user_id=u.id) AS official
+   FROM users u JOIN profiles p ON p.user_id=u.id WHERE u.id<>? AND u.is_banned=0 AND p.visible=1 AND p.discoverable=1 AND p.is_private=0
+   AND NOT EXISTS(SELECT 1 FROM social_follows f WHERE f.follower_id=? AND f.following_id=u.id)
+   AND NOT EXISTS(SELECT 1 FROM blocks b WHERE (b.blocker_id=? AND b.blocked_id=u.id) OR (b.blocker_id=u.id AND b.blocked_id=?))
+   ORDER BY u.created_at DESC LIMIT 8`,[user.id,user.id,user.id,user.id])).rows;
+  return output({people});
+ }
  if(method==='GET'&&/^\/api\/social\/posts\/[a-f\d-]{36}$/i.test(path)){
    const id=idGuard(path.split('/')[4]);await postVisible(env,id,user.id);
    const args=[user.id,user.id,user.id,user.id,user.id,user.id,id];
    const record=await one(env,feedSQL('sp.id=?')+' LIMIT 1',args);
+   if(!record&&await hasPrivateGrant(env,user.id,(await one(env,'SELECT user_id FROM social_posts WHERE id=?',[id]))?.user_id)){
+    const review=await one(env,`SELECT sp.id,sp.user_id AS userId,sp.caption,sp.media_id AS mediaId,sp.created_at AS createdAt,sm.mime AS mediaMime,${userDetails},0 AS likes,0 AS comments,0 AS liked,0 AS saved
+    FROM social_posts sp JOIN users u ON u.id=sp.user_id JOIN profiles p ON p.user_id=u.id LEFT JOIN social_media sm ON sm.id=sp.media_id WHERE sp.id=? AND sp.status='published' AND (sm.status='approved' OR sp.media_id IS NULL)`,[id]);if(review)return output({post:review});
+   }
    if(!record)err(404,'Beitrag nicht verfügbar');return output({post:record});
  }
  if(method==='GET'&&['/api/social/feed','/api/social/explore','/api/social/official','/api/social/saved','/api/social/liked'].includes(path)){
@@ -64,16 +103,29 @@ export async function socialRoutes(req,env,user){const url=new URL(req.url),path
   return output({posts:rows.slice(0,20),hasMore:rows.length>20,algorithm:'activity-recency-v1'});
  }
  if(method==='GET'&&path==='/api/social/stories'){
-  const stories=(await main(env,`SELECT s.id,s.user_id AS userId,s.body,s.background,s.media_id AS mediaId,s.created_at AS createdAt,s.expires_at AS expiresAt,sm.mime AS mediaMime,${userDetails}
+  const reviewId=url.searchParams.get('reviewUser');
+  if(reviewId){idGuard(reviewId);await staff(env,user,'private.profile.review');if(!await hasPrivateGrant(env,user.id,reviewId))err(403,'Prüfzugriff abgelaufen.');}
+  const stories=(await main(env,`SELECT s.id,s.user_id AS userId,s.body,s.background,s.story_style AS storyStyle,p.allow_story_reposts AS allowStoryReposts,CASE WHEN EXISTS(SELECT 1 FROM content_reviews cv WHERE cv.content_type='story' AND cv.content_id=s.id AND cv.status='approved') THEN 'approved' ELSE 'pending' END AS moderationStatus,s.media_id AS mediaId,s.created_at AS createdAt,s.expires_at AS expiresAt,sm.mime AS mediaMime,${userDetails}
  FROM social_stories s JOIN users u ON u.id=s.user_id JOIN profiles p ON p.user_id=u.id LEFT JOIN social_media sm ON sm.id=s.media_id
- WHERE s.expires_at>CURRENT_TIMESTAMP AND EXISTS(SELECT 1 FROM content_reviews cr WHERE cr.content_type='story' AND cr.content_id=s.id AND cr.status='approved') AND (s.media_id IS NULL OR sm.status='approved') AND p.visible=1 AND u.is_banned=0
+ WHERE s.expires_at>CURRENT_TIMESTAMP AND (s.user_id=? OR EXISTS(SELECT 1 FROM content_reviews cr WHERE cr.content_type='story' AND cr.content_id=s.id AND cr.status='approved')) AND (s.user_id=? OR s.media_id IS NULL OR sm.status='approved') AND p.visible=1 AND u.is_banned=0
  AND NOT EXISTS(SELECT 1 FROM blocks b WHERE (b.blocker_id=? AND b.blocked_id=u.id) OR (b.blocked_id=? AND b.blocker_id=u.id))
- AND (p.is_private=0 OR u.id=? OR EXISTS(SELECT 1 FROM social_follows f WHERE f.follower_id=? AND f.following_id=u.id))
- ORDER BY s.created_at DESC LIMIT 90`,[user.id,user.id,user.id,user.id])).rows;return output({stories});
+ AND ((? IS NOT NULL AND s.user_id=?) OR (? IS NULL AND (p.is_private=0 OR u.id=? OR EXISTS(SELECT 1 FROM social_follows f WHERE f.follower_id=? AND f.following_id=u.id))))
+ ORDER BY s.created_at DESC LIMIT 90`,[user.id,user.id,user.id,user.id,reviewId,reviewId,reviewId,user.id,user.id])).rows;return output({stories});
+ }
+ if(method==='DELETE'&&/^\/api\/social\/stories\/[a-f\d-]{36}$/i.test(path)){
+  const id=idGuard(path.split('/')[4]),record=await one(env,'SELECT user_id FROM social_stories WHERE id=?',[id]);
+  if(!record)err(404,'Story nicht gefunden.');
+  const isOwner=record.user_id===user.id;
+  if(!isOwner)await staff(env,user,'media.review');
+  const d=isOwner?{}:await body(req);const reason=clean(d.reason,400);
+  if(!isOwner&&reason.length<10)err(400,'Eine Begründung von mindestens 10 Zeichen ist erforderlich.');
+  await main(env,'UPDATE social_stories SET expires_at=CURRENT_TIMESTAMP WHERE id=?',[id]);
+  if(!isOwner)await audit(env,user.id,'story_removed_by_staff',id,reason);
+  return output({ok:true});
  }
  if(method==='POST'&&/^\/api\/social\/stories\/[a-f\d-]{36}\/(like|reply|repost)$/i.test(path)){
   const [,storyId,action]=path.match(/^\/api\/social\/stories\/([a-f\d-]{36})\/(like|reply|repost)$/i);
-  const story=await one(env,`SELECT s.*,p.is_private FROM social_stories s JOIN profiles p ON p.user_id=s.user_id
+  const story=await one(env,`SELECT s.*,p.is_private,p.allow_story_reposts FROM social_stories s JOIN profiles p ON p.user_id=s.user_id
    WHERE s.id=? AND s.expires_at>CURRENT_TIMESTAMP`,[storyId]);
   if(!story||await blocked(env,user.id,story.user_id))err(404,'Story nicht verfügbar');
   if(story.is_private&&story.user_id!==user.id&&!await one(env,'SELECT 1 AS n FROM social_follows WHERE follower_id=? AND following_id=?',[user.id,story.user_id]))err(404,'Story nicht verfügbar');
@@ -96,6 +148,7 @@ export async function socialRoutes(req,env,user){const url=new URL(req.url),path
   }
   // A follower may read a private Story but must not broadcast it to the public.
   if(story.is_private)err(403,'Private Stories können nicht öffentlich geteilt werden.');
+  if(!story.allow_story_reposts)err(403,'Diese Person erlaubt keine Story-Reposts.');
   // Repost becomes an ordinary moderated text post, never an unreviewed copy of the original private photo.
   const content=`Story von @${(await one(env,'SELECT username FROM users WHERE id=?',[story.user_id]))?.username||'Nutzer'}: ${text||'Schau dir diese Story an.'}`;
   const flagged=await policyFor(env,content);const id=uid(),auto=roleLevel(user.role)>=2&&!flagged.review;
@@ -122,9 +175,9 @@ export async function socialRoutes(req,env,user){const url=new URL(req.url),path
   const id=idGuard(path.slice('/api/social/media/'.length)),r=await one(env,'SELECT * FROM social_media WHERE id=?',[id]);if(!r)err(404,'Media not found');
   if(r.status!=='approved'&&r.user_id!==user.id&&roleLevel(user.role)<2)err(404,'Medium nicht verfügbar');
   if(r.status==='approved'&&await blocked(env,user.id,r.user_id))err(404,'Medium nicht verfügbar');
-  if(r.status==='approved'&&r.user_id!==user.id&&roleLevel(user.role)<2){
+  if(r.status==='approved'&&r.user_id!==user.id){
     const privacy=await one(env,'SELECT is_private FROM profiles WHERE user_id=?',[r.user_id]);
-    if(privacy?.is_private&&!await one(env,'SELECT 1 AS yes FROM social_follows WHERE follower_id=? AND following_id=?',[user.id,r.user_id]))err(404,'Medium nicht verfügbar');
+    if(privacy?.is_private&&!await one(env,'SELECT 1 AS yes FROM social_follows WHERE follower_id=? AND following_id=?',[user.id,r.user_id])&&!await hasPrivateGrant(env,user.id,r.user_id))err(404,'Medium nicht verfügbar');
     if(r.kind==='post'){
       const allowed=await one(env,`SELECT 1 AS ok FROM social_posts p WHERE p.media_id=? AND p.status='published'
         AND (p.visibility='public' OR EXISTS(SELECT 1 FROM social_follows f WHERE f.follower_id=? AND f.following_id=p.user_id)) LIMIT 1`,[id,user.id]);
@@ -153,6 +206,7 @@ export async function socialRoutes(req,env,user){const url=new URL(req.url),path
   const visibility=['public','followers'].includes(d.visibility)?d.visibility:'public',id=uid(),policy=await policyFor(env,caption),auto=roleLevel(user.role)>=2&&!policy.review;
   await main(env,'INSERT INTO social_posts(id,user_id,caption,media_id,visibility) VALUES(?,?,?,?,?)',[id,user.id,caption,mediaId,visibility]);
   await main(env,'INSERT INTO content_reviews(id,content_type,content_id,user_id,status,reason) VALUES(?,?,?,?,?,?)',[uid(),'post',id,user.id,auto?'approved':'pending',policy.review?'Automatischer Prüfhinweis (mehrsprachige Wortliste).':'' ]);
+  if(auto)await mentionNotify(env,caption,user.id,'post');
   return output({ok:true,id,pendingReview:!auto,policyReview:policy.review},201);
  }
  if(method==='POST'&&path==='/api/social/stories'){
@@ -160,9 +214,10 @@ export async function socialRoutes(req,env,user){const url=new URL(req.url),path
   if(!txt&&!mediaId)err(400,'Add a photo or some text');
   if(mediaId){idGuard(mediaId);const m=await one(env,'SELECT kind FROM social_media WHERE id=? AND user_id=?',[mediaId,user.id]);if(!m||m.kind!=='story')err(400,'Invalid story photo');}
   const recent=await one(env,"SELECT COUNT(*) AS n FROM social_stories WHERE user_id=? AND created_at>datetime('now','-1 hour')",[user.id]);if(Number(recent.n)>=12)err(429,'Too many stories');
-  const bg=/^#[\da-f]{6}$/i.test(d.background||'')?d.background:'#6436d8',id=uid(),policy=await policyFor(env,txt),auto=roleLevel(user.role)>=2&&!policy.review;
-  await main(env,'INSERT INTO social_stories(id,user_id,media_id,body,background) VALUES(?,?,?,?,?)',[id,user.id,mediaId,txt,bg]);
+  const bg=/^#[\da-f]{6}$/i.test(d.background||'')?d.background:'#6436d8',style=validStoryStyle(d.style),id=uid(),policy=await policyFor(env,txt),auto=roleLevel(user.role)>=2&&!policy.review;
+  await main(env,'INSERT INTO social_stories(id,user_id,media_id,body,background,story_style) VALUES(?,?,?,?,?,?)',[id,user.id,mediaId,txt,bg,style]);
   await main(env,'INSERT INTO content_reviews(id,content_type,content_id,user_id,status,reason) VALUES(?,?,?,?,?,?)',[uid(),'story',id,user.id,auto?'approved':'pending',policy.review?'Automatischer Prüfhinweis (mehrsprachige Wortliste).':'' ]);
+  if(auto)await mentionNotify(env,txt,user.id,'story');
   return output({ok:true,id,pendingReview:!auto,expiresInHours:24},201);
  }
  if(method==='GET'&&/^\/api\/social\/profiles\/[a-f\d-]{36}\/(followers|following)$/i.test(path)){
@@ -188,15 +243,16 @@ export async function socialRoutes(req,env,user){const url=new URL(req.url),path
  if(method==='GET'&&path.startsWith('/api/social/profiles/')){
   const id=idGuard(path.slice('/api/social/profiles/'.length)),p=await target(env,id);
   if(await blocked(env,user.id,id))err(404,'Profile unavailable');
+  const reviewGrant=id!==user.id&&await hasPrivateGrant(env,user.id,id);
   const posts=(await main(env,`SELECT sp.id,sp.caption,sp.media_id AS mediaId,sm.mime AS mediaMime,sp.created_at AS createdAt FROM social_posts sp LEFT JOIN social_media sm ON sm.id=sp.media_id
-  WHERE sp.user_id=? AND sp.status='published' AND (sp.media_id IS NULL OR sm.status='approved') AND EXISTS(SELECT 1 FROM content_reviews cr WHERE cr.content_type='post' AND cr.content_id=sp.id AND cr.status='approved') AND ((sp.visibility='public' AND ?=0) OR sp.user_id=? OR EXISTS(SELECT 1 FROM social_follows sf WHERE sf.follower_id=? AND sf.following_id=?)) ORDER BY sp.created_at DESC LIMIT 60`,[id,p.isPrivate?1:0,user.id,user.id,id])).rows;
+  WHERE sp.user_id=? AND sp.status='published' AND (sp.media_id IS NULL OR sm.status='approved') AND EXISTS(SELECT 1 FROM content_reviews cr WHERE cr.content_type='post' AND cr.content_id=sp.id AND cr.status='approved') AND ((sp.visibility='public' AND ?=0) OR sp.user_id=? OR EXISTS(SELECT 1 FROM social_follows sf WHERE sf.follower_id=? AND sf.following_id=?) OR ?=1) ORDER BY sp.created_at DESC LIMIT 60`,[id,p.isPrivate?1:0,user.id,user.id,id,reviewGrant?1:0])).rows;
   const followers=(await one(env,'SELECT COUNT(*) AS n FROM social_follows WHERE following_id=?',[id]))?.n||0;
   const following=(await one(env,'SELECT COUNT(*) AS n FROM social_follows WHERE follower_id=?',[id]))?.n||0;
   const totalLikes=(await one(env,`SELECT COUNT(*) AS n FROM social_post_likes l JOIN social_posts p ON p.id=l.post_id WHERE p.user_id=? AND p.status='published'`,[id]))?.n||0;
   const followingUser=!!await one(env,'SELECT 1 AS n FROM social_follows WHERE follower_id=? AND following_id=?',[user.id,id]);
   const requested=!!await one(env,'SELECT 1 AS n FROM social_follow_requests WHERE follower_id=? AND following_id=?',[user.id,id]);
   const labels=(await main(env,'SELECT label,color FROM profile_labels WHERE user_id=? LIMIT 5',[id])).rows;
-  return output({profile:{...p,followers,following,totalLikes,followingUser,requested,labels,posts}});
+  return output({profile:{...p,reviewAccess:!!reviewGrant,followers,following,totalLikes,followingUser,requested,labels,posts}});
  }
  if(method==='POST'&&path==='/api/social/follow'){
   const d=await body(req),to=idGuard(d.userId);if(to===user.id)err(400,'Cannot follow yourself');await target(env,to);if(await blocked(env,user.id,to))err(403,'Profile not available');
@@ -271,6 +327,7 @@ export async function socialRoutes(req,env,user){const url=new URL(req.url),path
   const cid=uid(),policy=await policyFor(env,txt),auto=roleLevel(user.role)>=2&&!policy.review;await main(env,'INSERT INTO social_comments(id,post_id,user_id,body,parent_id) VALUES(?,?,?,?,?)',[cid,id,user.id,txt,parentId]);
   await main(env,'INSERT INTO content_reviews(id,content_type,content_id,user_id,status,reason) VALUES(?,?,?,?,?,?)',[uid(),'comment',cid,user.id,auto?'approved':'pending',policy.review?'Automatischer Prüfhinweis (mehrsprachige Wortliste).':'']);
   // Benachrichtigung erst nach Moderationsfreigabe des Kommentars.
+  if(auto)await mentionNotify(env,txt,user.id,'comment');
   return output({ok:true,pendingReview:!auto},201);
  }
  if(method==='DELETE'&&/^\/api\/social\/posts\/[a-f\d-]{36}$/i.test(path)){
@@ -436,15 +493,12 @@ export async function socialRoutes(req,env,user){const url=new URL(req.url),path
   if(type==='story'&&status==='approved'){
     await main(env,"UPDATE social_stories SET expires_at=datetime('now','+24 hours') WHERE id=?",[id]);
     const st=await one(env,'SELECT body,user_id FROM social_stories WHERE id=?',[id]);
-    for(const name of [...new Set((st?.body||'').match(/@[a-z][a-z0-9._]{9,23}/gi)||[])].slice(0,5)){
-      const mention=await one(env,'SELECT id FROM users WHERE username=? COLLATE NOCASE',[name.slice(1)]);
-      if(mention&&mention.id!==st.user_id)await notify(env,mention.id,'mention','Du wurdest in einer Story erwähnt','Eine neue Erwähnung ist verfügbar.',st.user_id);
-    }
+    if(st)await mentionNotify(env,st.body,st.user_id,'story');
   }
   await audit(env,user.id,'content_'+status,id,`${type}: ${reason}`);
   await notify(env,entry.user_id,'moderation',status==='approved'?'Inhalt freigegeben':'Inhalt abgelehnt',reason||'Dein Beitrag wurde geprüft.',user.id);
-  if(status==='approved'&&type==='comment'){const c=await one(env,'SELECT post_id,user_id FROM social_comments WHERE id=?',[id]);const post=await one(env,'SELECT user_id FROM social_posts WHERE id=?',[c?.post_id]);if(post&&post.user_id!==entry.user_id)await notify(env,post.user_id,'comment','Neuer Kommentar',`${user.username||'Jemand'} hat deinen Beitrag kommentiert.`,entry.user_id);}
-  if(status==='approved'&&type==='post'){
+  if(status==='approved'&&type==='comment'){const c=await one(env,'SELECT post_id,user_id,body FROM social_comments WHERE id=?',[id]);if(c)await mentionNotify(env,c.body,c.user_id,'comment');const post=await one(env,'SELECT user_id FROM social_posts WHERE id=?',[c?.post_id]);if(post&&post.user_id!==entry.user_id)await notify(env,post.user_id,'comment','Neuer Kommentar',`${user.username||'Jemand'} hat deinen Beitrag kommentiert.`,entry.user_id);}
+  if(status==='approved'&&type==='post'){const tagged=await one(env,'SELECT caption,user_id FROM social_posts WHERE id=?',[id]);if(tagged)await mentionNotify(env,tagged.caption,tagged.user_id,'post');
     const followers=(await main(env,'SELECT follower_id AS id FROM social_follows WHERE following_id=? LIMIT 100',[entry.user_id])).rows;
     await pushLive(env,followers.map(x=>x.id),'feed');
   }
@@ -491,7 +545,8 @@ export async function socialRoutes(req,env,user){const url=new URL(req.url),path
 }
 
 export async function pruneSocial(env){
- const expired=(await main(env,"SELECT id,media_id FROM social_stories WHERE expires_at<CURRENT_TIMESTAMP ORDER BY expires_at ASC LIMIT 18")).rows;
+ await main(env,"DELETE FROM staff_private_review_access WHERE expires_at<CURRENT_TIMESTAMP");
+ const expired=(await main(env,"SELECT s.id,s.media_id FROM social_stories s WHERE s.expires_at<CURRENT_TIMESTAMP AND NOT EXISTS(SELECT 1 FROM social_reports r WHERE r.story_id=s.id AND (r.status='open' OR r.created_at>datetime('now','-90 days'))) ORDER BY s.expires_at ASC LIMIT 18")).rows;
  for(const s of expired){
    await main(env,'DELETE FROM social_story_likes WHERE story_id=?',[s.id]);
    await main(env,'DELETE FROM social_stories WHERE id=?',[s.id]);

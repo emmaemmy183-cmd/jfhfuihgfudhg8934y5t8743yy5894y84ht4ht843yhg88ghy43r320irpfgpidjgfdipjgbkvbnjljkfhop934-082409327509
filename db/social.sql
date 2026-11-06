@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS social_comments (
 CREATE INDEX IF NOT EXISTS idx_social_comments_post ON social_comments(post_id,created_at);
 CREATE TABLE IF NOT EXISTS social_stories (
  id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),media_id TEXT REFERENCES social_media(id),
- body TEXT NOT NULL DEFAULT '', background TEXT NOT NULL DEFAULT '#6436d8',created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ body TEXT NOT NULL DEFAULT '', background TEXT NOT NULL DEFAULT '#6436d8',story_style TEXT NOT NULL DEFAULT '{}',created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
  expires_at TEXT NOT NULL DEFAULT (datetime('now','+24 hours'))
 );
 CREATE INDEX IF NOT EXISTS idx_social_stories_expiry ON social_stories(expires_at,created_at DESC);

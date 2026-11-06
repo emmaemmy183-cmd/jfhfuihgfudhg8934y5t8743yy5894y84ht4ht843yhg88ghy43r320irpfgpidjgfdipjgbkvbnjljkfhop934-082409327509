@@ -1,3 +1,13 @@
+# Kennely 2027.19 – vollständige Foto-Plattform (Netlify / Turso)
+
+**Neueste Anleitung: [`UPDATE_2027_19.md`](UPDATE_2027_19.md).** Dieses ZIP ist das komplette Repository, kein reiner Patch. Es basiert auf Kennely 2027.18.
+
+Die neue Version ergänzt eine eigenständige Desktop-Aufteilung (kompakte linke Navigation, Foto-Feed in der Mitte, echte Mitgliedervorschläge rechts), einen zweispaltigen Einstellungsbereich, einen Story-Editor mit Text, Position/Farbe/Schriftgröße und `@`-Markierungen, benutzerseitige Story-Löschung, moderierte Story-Löschung durch berechtigte Teammitglieder und einen abschaltbaren Story-Repost-Schalter. Erwähnungen in Kommentaren, Fotobeiträgen und Storys sind anklickbar und lösen nach der Freigabe Benachrichtigungen aus. Private Profile sind für Moderationszwecke nur nach einem dokumentierten Anlass und für 10 Minuten einsehbar. Private Chats bleiben geschützt.
+
+**Weiterhin keine Reels, Videos oder Live-Streams.** Neue Ansichtselemente können nur tatsächliche Mitglieder anzeigen, keine erfundenen Profile. Die Serverfunktionen, die zwei vorhandenen Turso-Datenbanken, SendPulse, die Moderations- und Audit-Funktionen bleiben erhalten. Ein produktiver Funktionstest auf der tatsächlichen Domain ist noch erforderlich.
+
+---
+
 # Kennely 2027.18 – responsive Foto-Community
 
 **Aktuelle Update-Anleitung: [`UPDATE_2027_18.md`](UPDATE_2027_18.md)**

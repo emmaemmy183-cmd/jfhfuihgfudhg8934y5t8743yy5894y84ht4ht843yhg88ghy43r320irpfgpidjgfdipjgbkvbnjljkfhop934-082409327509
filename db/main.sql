@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   follow_visibility TEXT NOT NULL DEFAULT 'everyone',
   comment_policy TEXT NOT NULL DEFAULT 'everyone',
   discoverable INTEGER NOT NULL DEFAULT 1,
+  allow_story_reposts INTEGER NOT NULL DEFAULT 0,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_profiles_name ON profiles(display_name COLLATE NOCASE);

@@ -1,0 +1,107 @@
+/* Kennely 2027.19 — original Kennely colors, desktop-first information architecture,
+   photo-only feed, story editing and accessible phone layouts. */
+:root{--kn-violet:#a16afa;--kn-stroke:color-mix(in srgb,var(--line) 88%,transparent)}
+.kn-mention{color:var(--accent);font:inherit;font-weight:750;padding:0 1px;border:0;background:transparent;display:inline;cursor:pointer}
+.kn-mention:hover{text-decoration:underline}
+.kn-mention-choices{display:flex;flex-direction:column;gap:2px;max-height:215px;overflow-y:auto;min-width:0}
+.kn-mention-choices:empty{display:none}
+.kn-mention-choices>button{border:1px solid var(--kn-stroke);color:var(--text);background:var(--surface2);border-radius:12px;padding:9px 12px;display:flex;align-items:center;gap:10px;text-align:left;min-height:49px}
+.kn-mention-choices>button:hover,.kn-mention-choices>button:focus-visible{outline:2px solid var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--surface))}
+.kn-mention-choices>button span{display:grid;gap:3px}.kn-mention-choices small{color:var(--muted)}
+/* Main feed — less card chrome and more useful information in the sidebar. */
+.kn-rail-profile{display:flex;align-items:center;gap:10px;padding:9px 0 20px}.kn-rail-profile>div{flex:1;min-width:0;display:grid;gap:4px}.kn-rail-profile strong,.kn-suggestion strong{font-weight:750;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.kn-rail-profile small,.kn-suggestion small{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kn-rail-profile .tiny-btn,.kn-suggestion>.tiny-btn{color:var(--accent);font-weight:750;white-space:nowrap}
+.kn-rail-discovery{padding:10px 0 16px}.kn-rail-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.kn-rail-title h3{font-size:14px;color:var(--muted);margin:0}.kn-rail-title .tiny-btn{color:var(--text)}
+.kn-suggestion{display:flex;gap:10px;align-items:center;padding:8px 0}.kn-suggestion .avatar{flex-shrink:0}.kn-suggestion-name{background:transparent;border:0;padding:0;text-align:left;min-width:0;display:grid;gap:4px;flex:1;color:var(--text)}.kn-rail-bottom{font-size:11px;line-height:1.7;color:var(--muted);opacity:.85;padding:0 0 20px}
+.kn-rail-bottom a:hover{text-decoration:underline}
+.kn-mobile-recommendations{display:none}
+.kn-feed-list{max-width:570px;margin:auto}
+body[data-view=feed] .story-bar,body[data-view=feed] .filter-row{max-width:570px;margin-inline:auto}
+body[data-view=feed] .post{box-shadow:none;background:transparent;border-color:transparent;border-bottom:1px solid var(--kn-stroke);border-radius:0;padding-bottom:18px;margin-bottom:9px}
+body[data-view=feed] .post-top{padding:12px 6px}
+body[data-view=feed] .post-name small{font-size:11px}
+body[data-view=feed] .post-image-open{width:100%;padding:0;display:grid;place-items:center;background:color-mix(in srgb,var(--surface) 85%,#08080e);border-radius:6px;overflow:hidden}
+body[data-view=feed] .post-photo{width:100%;height:auto;max-height:min(75vh,720px);aspect-ratio:auto;object-fit:contain;border-radius:6px}
+body[data-view=feed] .post-actions{padding-inline:0}
+body[data-view=feed] .post-meta,body[data-view=feed] .post-copy,body[data-view=feed] .post-comment-link{padding-inline:3px}
+/* Add a compact left icon rail on genuinely large desktop monitors. */
+@media(min-width:1260px){
+ .sidebar{width:84px!important;padding:22px 12px!important;align-items:stretch;transition:width .18s ease}
+ .sidebar .side-logo{margin:0 auto 32px!important;justify-content:center}
+ .sidebar .side-logo img{width:40px;height:40px}
+ .sidebar .side-logo strong,.sidebar .navigation .nav-item>span:not(.number-badge),.sidebar .side-bottom .nav-item>span,.sidebar .side-identity>div,.sidebar .side-link{display:none!important}
+ .sidebar .nav-item{justify-content:center;padding:10px 6px;gap:0;min-height:53px}
+ .sidebar .nav-item svg{width:26px;height:26px}
+ .sidebar .side-identity{border:0;padding:9px;justify-content:center}
+ .sidebar .side-bottom{gap:8px}
+ .sidebar .side-identity .avatar{width:40px;height:40px}
+ .sidebar .nav-item .number-badge{position:absolute;right:3px;top:4px;margin:0}
+ .workarea{margin-left:84px!important;gap:clamp(34px,5vw,95px);padding-inline:clamp(24px,4vw,80px)}
+ body[data-view=feed] .content{width:min(100%,630px)!important}
+ body[data-view=feed] .right-rail{width:min(27vw,330px);max-width:330px;display:block!important}
+}
+/* Settings — compact left sections, actionable main column. */
+.kn-settings-layout{display:grid;grid-template-columns:minmax(215px,270px) minmax(0,650px);align-items:start;gap:clamp(20px,3vw,45px);width:100%}
+.kn-settings-side{position:sticky;top:25px;display:grid;gap:5px;padding:18px 12px;min-width:0;max-height:calc(100vh - 50px);overflow-y:auto;overscroll-behavior:contain;border-right:1px solid var(--kn-stroke)}
+.kn-settings-side h3{font-size:13px;font-weight:800;margin:0 6px 10px;color:var(--muted)}
+.kn-settings-side button{background:transparent;color:var(--text);border:0;text-align:left;font-size:13px;font-weight:650;border-radius:11px;padding:13px 12px;min-height:44px;line-height:1.35}
+.kn-settings-side button:hover,.kn-settings-side button:focus-visible{background:var(--surface2);outline:2px solid var(--kn-violet)}
+.kn-settings-layout .settings-grid{grid-template-columns:minmax(0,1fr)!important;gap:16px!important;min-width:0}
+.kn-settings-layout .setting-group{background:var(--surface);box-shadow:none!important;padding:clamp(17px,2.3vw,28px);scroll-margin-top:20px}
+.kn-settings-layout .setting-group h3{font-size:17px}
+.kn-settings-layout .field select,.kn-settings-layout .field input{min-height:46px}
+.kn-settings-layout .setting-priority{border-color:color-mix(in srgb,var(--accent) 25%,var(--line));}
+/* Media editing — text layers stored as small metadata, not a second rendered photo. */
+#modal:has(.kn-story-editor){width:min(94vw,940px);max-width:940px;max-height:94dvh}
+#modal:has(.kn-story-editor) .modal-shell{padding:clamp(16px,2vw,28px);max-height:91dvh}
+.kn-story-editor{display:grid;grid-template-columns:minmax(210px,325px) minmax(260px,1fr);gap:24px;align-items:start}
+.kn-story-canvas{aspect-ratio:9/16;width:100%;max-height:540px;border-radius:19px;position:relative;overflow:hidden;background:#6436d8;display:block;box-shadow:0 12px 35px #0003}
+.kn-story-canvas>img{display:block;width:100%;height:100%;object-fit:contain;position:absolute;inset:0}
+.kn-story-canvas>img[hidden]{display:none}
+.kn-story-canvas>span{position:absolute;transform:translate(-50%,-50%);left:50%;top:50%;z-index:2;width:min(85%,290px);font-size:28px;color:white;line-height:1.22;font-weight:800;text-align:center;white-space:pre-wrap;overflow-wrap:anywhere;text-shadow:0 2px 8px #0008;pointer-events:none}
+.kn-story-controls{display:grid;gap:13px;min-width:0}.kn-story-controls>.field{margin:0}.kn-story-controls textarea{min-height:95px;resize:vertical}
+.kn-story-toolrow{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.kn-story-toolrow label{display:grid;align-content:start;gap:8px;color:var(--muted);font-size:12px;font-weight:650}
+.kn-story-toolrow select,.kn-story-toolrow input[type=color]{min-height:40px}.kn-story-toolrow input[type=color]{width:100%;border-radius:9px;background:var(--surface2);border:1px solid var(--line)}
+.kn-story-toolrow input[type=range]{width:100%;accent-color:var(--accent)}
+.kn-photo-choose{display:flex;align-items:center;gap:16px;padding:14px 17px;border:1px dashed color-mix(in srgb,var(--accent) 50%,var(--line));border-radius:15px;background:color-mix(in srgb,var(--accent) 7%,var(--surface));}
+.kn-photo-choose .photo-picker-plus{width:52px;height:52px;flex:0 0 52px;display:grid;place-items:center;font-size:32px;margin:0}
+.kn-photo-choose>div{min-width:0;display:grid;gap:3px}.kn-photo-choose>div strong{font-size:14px}.kn-photo-choose>div p{margin:0!important;color:var(--muted);line-height:1.5;font-size:12px}
+.kn-compose-image-preview{display:block;width:100%;max-height:240px;object-fit:contain;border-radius:12px;background:var(--surface2)}
+/* Full story viewer with underlay image, positioned text and self-service actions. */
+#modal:has(.kn-story-viewer){width:min(94vw,440px);max-width:440px;max-height:96dvh}
+#modal:has(.kn-story-viewer) .modal-shell{padding:16px!important;max-height:94dvh}
+.kn-story-top{display:flex;align-items:center;gap:10px;margin:0 38px 12px 2px}.kn-story-top strong{font-size:14px}.kn-story-top>span:last-child{font-size:11px;color:var(--muted);margin-left:auto}
+.kn-story-viewer .story-full{position:relative;min-height:0;aspect-ratio:9/16;width:100%;max-height:70dvh;overflow:hidden;padding:0;display:block;border-radius:14px}
+.kn-story-viewer .story-full img{width:100%;height:100%;position:absolute;inset:0;object-fit:contain}
+.kn-story-viewer .story-full:before{pointer-events:none}
+.kn-story-viewer .story-full .kn-story-overlay{position:absolute;transform:translate(-50%,-50%);z-index:3;width:min(80%,320px);white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.22;font-weight:800;text-shadow:0 2px 10px #000a}
+.kn-story-viewer .story-full .kn-story-overlay button{color:inherit;text-decoration:underline}
+.kn-story-toolbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding-top:10px}.kn-story-toolbar .button{width:auto;flex:1 1 auto}
+.kn-story-reply{display:flex;gap:8px;padding:10px 2px 0}.kn-story-reply[hidden]{display:none}.kn-story-reply input{min-width:0;flex:1;border-radius:99px;padding:10px 13px;border:1px solid var(--line);background:var(--surface2);color:var(--text)}.kn-story-reply .button{width:auto}
+.kn-review-notice{padding:13px 17px;border:1px solid color-mix(in srgb,var(--accent) 55%,var(--line));border-radius:12px;margin:14px 0 20px;color:var(--muted);font-size:12px}
+.kn-review-stories{margin-top:30px}.kn-review-stories h3{font-size:16px}
+/* Compose and comment fields are visible and comfortably editable. */
+.kn-comment-composer{min-width:0;align-items:stretch!important}.kn-comment-composer textarea{min-width:0!important;min-height:62px!important;width:100%;font-size:14px!important;line-height:1.5;padding:13px 14px!important}
+.kn-comment-composer .kn-mention-choices{grid-column:1/-1;width:100%;flex:0 0 100%;order:3}
+.kn-detail-caption .kn-mention{display:inline}
+/* Compact accessibility choices, preserve system zoom instead of blocking it. */
+.kn-review-private{font-size:12px!important}
+button:focus-visible,a:focus-visible{outline:2px solid var(--kn-violet);outline-offset:3px}
+@media(min-width:761px) and (max-width:1150px){.kn-settings-layout{grid-template-columns:minmax(175px,220px) minmax(0,1fr)}.kn-settings-side{padding-inline:0}}
+@media(max-width:760px){
+ .kn-settings-layout{display:block}.kn-settings-side{display:none}.kn-settings-layout .settings-grid{display:grid;grid-template-columns:1fr!important}
+ .kn-rail-profile,.kn-rail-discovery,.kn-rail-bottom{display:none}
+ .kn-mobile-recommendations{display:block;margin:22px 7px;padding:14px 10px 20px;border-top:1px solid var(--line)}.kn-mobile-recommendations h3{font-size:14px;margin:0 0 12px}
+ .kn-mobile-recommendations .kn-suggestion{padding:11px 3px}
+ body[data-view=feed] .post{border-left:0;border-right:0;border-radius:0!important}
+ body[data-view=feed] .post-photo{max-height:75dvh;width:100%;object-fit:contain;aspect-ratio:auto}
+ .kn-story-editor{grid-template-columns:1fr;gap:12px}.kn-story-canvas{width:min(100%,265px);max-height:340px;margin:0 auto;aspect-ratio:9/12}
+ #modal:has(.kn-story-editor) .modal-shell{padding:22px 13px!important;max-height:92dvh;overflow-y:auto}
+ .kn-story-toolrow{gap:8px}.kn-story-controls{gap:8px}
+ .kn-photo-choose{padding:11px}
+ .kn-story-viewer .story-full{max-height:66dvh}
+ .kn-story-toolbar .button{font-size:12px}
+ .kn-mention-choices>button{min-height:45px}
+}
+@media(prefers-reduced-motion:reduce){.sidebar{transition:none!important}}

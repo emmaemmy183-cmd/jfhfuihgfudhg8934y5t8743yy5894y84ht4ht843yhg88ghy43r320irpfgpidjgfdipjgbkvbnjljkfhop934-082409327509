@@ -11,7 +11,7 @@ const out=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{
 async function parse(req){if(!req.headers.get('content-type')?.startsWith('application/json'))throwHttp(415,'JSON benötigt.');const text=await req.text();if(text.length>15000)throwHttp(413,'Anfrage zu groß.');try{return JSON.parse(text)}catch{throwHttp(400,'Ungültige Angaben.')}}
 async function log(env,actor,action,target,details=''){await main(env,'INSERT INTO admin_audit(id,actor_id,action,target_id,details) VALUES(?,?,?,?,?)',[uid(),actor,action,target,details]);}
 const CAPS={
- 'user.inspect':3,'identity.edit':3,'badge.manage':3,'account.suspend':4,'account.delete':5,
+ 'private.profile.review':2,'user.inspect':3,'identity.edit':3,'badge.manage':3,'account.suspend':4,'account.delete':5,
  'team.manage':5,'permissions.manage':5,'terms.manage':4,'labels.manage':5,'labels.self':1,'audit.view':4,'media.review':2,'reports.review':2
 };
 export const CAPABILITIES=Object.freeze(Object.keys(CAPS));
@@ -131,8 +131,8 @@ export async function controls(req,env,user){
   return out({ok:true});
  }
  if(method==='GET'&&path==='/api/account/privacy/preferences'){
-  const p=await one(env,'SELECT is_private AS isPrivate,message_policy AS messagePolicy,follow_visibility AS followVisibility, comment_policy AS commentPolicy, discoverable FROM profiles WHERE user_id=?',[user.id]);
-  return out({privacy:{isPrivate:!!p?.isPrivate,messagePolicy:p?.messagePolicy||'everyone',followVisibility:p?.followVisibility||'everyone',commentPolicy:p?.commentPolicy||'everyone',discoverable:p?.discoverable!==0}});
+  const p=await one(env,'SELECT is_private AS isPrivate,message_policy AS messagePolicy,follow_visibility AS followVisibility, comment_policy AS commentPolicy, discoverable, allow_story_reposts AS allowStoryReposts FROM profiles WHERE user_id=?',[user.id]);
+  return out({privacy:{isPrivate:!!p?.isPrivate,messagePolicy:p?.messagePolicy||'everyone',followVisibility:p?.followVisibility||'everyone',commentPolicy:p?.commentPolicy||'everyone',discoverable:p?.discoverable!==0,allowStoryReposts:!!p?.allowStoryReposts}});
  }
  if(method==='PATCH'&&path==='/api/account/privacy/preferences'){
   const d=await parse(req),updates=[],args=[];
@@ -140,6 +140,7 @@ export async function controls(req,env,user){
   if(d.messagePolicy!==undefined){if(!['everyone','followers','nobody'].includes(d.messagePolicy))throwHttp(400,'Ungültige Chat-Einstellung.');updates.push('message_policy=?');args.push(d.messagePolicy);}
   if(d.followVisibility!==undefined){if(!['everyone','followers','only_me'].includes(d.followVisibility))throwHttp(400,'Ungültige Follower-Einstellung.');updates.push('follow_visibility=?');args.push(d.followVisibility);}
   if(d.commentPolicy!==undefined){if(!['everyone','followers','nobody'].includes(d.commentPolicy))throwHttp(400,'Ungültige Kommentar-Einstellung.');updates.push('comment_policy=?');args.push(d.commentPolicy);}
+  if(d.allowStoryReposts!==undefined){if(typeof d.allowStoryReposts!=='boolean')throwHttp(400,'Ungültige Story-Einstellung.');updates.push('allow_story_reposts=?');args.push(d.allowStoryReposts?1:0);}
   if(d.discoverable!==undefined){if(typeof d.discoverable!=='boolean')throwHttp(400,'Ungültige Sichtbarkeit.');updates.push('discoverable=?');args.push(d.discoverable?1:0);}
   if(!updates.length)throwHttp(400,'Keine Änderungen.');
   await main(env,`UPDATE profiles SET ${updates.join(',')},updated_at=CURRENT_TIMESTAMP WHERE user_id=?`,[...args,user.id]);return out({ok:true});

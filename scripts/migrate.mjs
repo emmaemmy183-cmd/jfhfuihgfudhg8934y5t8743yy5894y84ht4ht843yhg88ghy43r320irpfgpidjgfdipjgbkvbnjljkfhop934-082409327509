@@ -5,7 +5,8 @@ const env = process.env;
 // Extend existing user databases before CREATE INDEX statements reference the new columns.
 const upgrades = {
  users: {username: 'TEXT COLLATE NOCASE', email_verified_at: 'TEXT', last_login_at: 'TEXT', username_changed_at:'TEXT'},
- profiles:{is_private:'INTEGER NOT NULL DEFAULT 0', display_name_changed_at:'TEXT', message_policy:"TEXT NOT NULL DEFAULT 'everyone'", follow_visibility:"TEXT NOT NULL DEFAULT 'everyone'", comment_policy:"TEXT NOT NULL DEFAULT 'everyone'", discoverable:'INTEGER NOT NULL DEFAULT 1'},
+ profiles:{is_private:'INTEGER NOT NULL DEFAULT 0', display_name_changed_at:'TEXT', message_policy:"TEXT NOT NULL DEFAULT 'everyone'", follow_visibility:"TEXT NOT NULL DEFAULT 'everyone'", comment_policy:"TEXT NOT NULL DEFAULT 'everyone'", discoverable:'INTEGER NOT NULL DEFAULT 1', allow_story_reposts:'INTEGER NOT NULL DEFAULT 0'},
+ social_stories:{story_style:"TEXT NOT NULL DEFAULT '{}'"},
  social_comments:{parent_id:'TEXT'},
  social_dms:{read_at:'TEXT'},
  photos: {status: "TEXT NOT NULL DEFAULT 'pending'", reviewed_at:'TEXT', reviewed_by:'TEXT', rejection_reason:'TEXT'}

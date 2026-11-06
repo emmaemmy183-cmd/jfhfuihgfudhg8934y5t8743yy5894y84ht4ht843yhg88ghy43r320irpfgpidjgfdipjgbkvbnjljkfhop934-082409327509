@@ -44,5 +44,5 @@ test('2027.18: profile, messages and settings use separate desktop layout',async
  assert.match(css,/body\[data-view=profile\] \.content/);
  assert.match(css,/body\[data-view=messages\] \.content/);
  assert.match(css,/body\[data-view=settings\] \.content/);
- assert.match(html,/ken18-ui\.css\?v=2027\.18\.0/);
+ assert.match(html,/ken18-ui\.css\?v=2027\.19\.0/);
 });

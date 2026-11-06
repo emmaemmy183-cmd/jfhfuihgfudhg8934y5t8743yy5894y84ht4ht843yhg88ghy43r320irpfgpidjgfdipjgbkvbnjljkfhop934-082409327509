@@ -532,6 +532,7 @@ async function api(req, env) {
       ['DELETE FROM social_post_saves WHERE user_id=? OR post_id IN (SELECT id FROM social_posts WHERE user_id=?)',[user.id,user.id]],
       ['DELETE FROM social_comment_likes WHERE user_id=? OR comment_id IN (SELECT id FROM social_comments WHERE user_id=? OR post_id IN (SELECT id FROM social_posts WHERE user_id=?))',[user.id,user.id,user.id]],
 
+      ['DELETE FROM staff_private_review_access WHERE actor_id=? OR target_id=?',[user.id,user.id]],
       ['DELETE FROM social_follow_requests WHERE follower_id=? OR following_id=?',[user.id,user.id]],
       ['DELETE FROM social_story_likes WHERE user_id=? OR story_id IN (SELECT id FROM social_stories WHERE user_id=?)',[user.id,user.id]],
       ['DELETE FROM profile_labels WHERE user_id=?',[user.id]],
