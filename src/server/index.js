@@ -61,7 +61,8 @@ function safeUser(row) {
 }
 function profile(row) {
   return { id:row.id, username:row.username||null, name:row.display_name||row.username, age:yearsOld(row.birth_date), city:row.city,
-    gender:row.gender, intent:row.intent, bio:row.bio,
+    gender:row.gender, intent:row.intent, bio:row.bio, pronouns:row.pronouns||'', sexuality:row.sexuality||'',
+    links:(()=>{try{return JSON.parse(row.linksJson||'[]')}catch{return []}})(),
     interests:JSON.parse(row.interests||'[]'), photoId:row.photo_id || null, staffRole:row.staff_role||null, official:!!row.official, isPrivate:!!row.is_private, labels:row.labels||[] };
 }
 async function loginSession(req, env, userId) {
@@ -217,10 +218,26 @@ async function api(req, env) {
     if(me.email_verified_at)return json({ok:true});
     if(!mailConfigured(env))error(503,'E-Mail-Dienst nicht verfügbar.');
     await rateLimit(env,req,'resend-verification',4,60);
+    const last=await one(env,"SELECT created_at FROM email_tokens WHERE user_id=? AND kind='verify' ORDER BY created_at DESC LIMIT 1",[me.id]);
+    if(last?.created_at){const lastMs=Date.parse(String(last.created_at).replace(' ','T')+'Z');if(Number.isFinite(lastMs)){
+      const seconds=Math.ceil((60000-(Date.now()-lastMs))/1000);if(seconds>0)error(429,`Bitte ${seconds} Sekunden warten, bevor du einen neuen Link anforderst.`);
+    }}
     const secret=randomToken();
     await main(env,"INSERT INTO email_tokens(token_hash,user_id,kind,expires_at) VALUES(?,?,'verify',datetime('now','+24 hours'))",[await digest(secret),me.id]);
     await sendMail(env,{to:me.email,subject:'Kennely · Bestätigung erneut senden',text:`Bestätige deine E-Mail-Adresse: ${env.PUBLIC_ORIGIN}/api/auth/verify?token=${secret}\n\nGültig für 24 Stunden.`});
     return json({ok:true});
+  }
+  if(method==='GET'&&path==='/api/auth/confirm-email-change'){
+    const token=String(url.searchParams.get('token')||'');
+    if(!/^[a-f0-9]{64}$/i.test(token))error(400,'Ungültiger Bestätigungslink.');
+    const hash=await digest(token);
+    const record=await one(env,`SELECT ec.user_id AS userId,ec.new_email AS newEmail FROM account_email_changes ec
+      WHERE ec.token_hash=? AND ec.used_at IS NULL AND ec.expires_at>CURRENT_TIMESTAMP`,[hash]);
+    if(!record)error(410,'Bestätigungslink abgelaufen oder bereits verwendet.');
+    if(await one(env,'SELECT id FROM users WHERE email=? AND id<>?',[record.newEmail,record.userId]))error(409,'Diese E-Mail-Adresse wird bereits verwendet.');
+    await main(env,'UPDATE users SET email=?,email_verified_at=CURRENT_TIMESTAMP WHERE id=?',[record.newEmail,record.userId]);
+    await main(env,'UPDATE account_email_changes SET used_at=CURRENT_TIMESTAMP WHERE token_hash=?',[hash]);
+    return Response.redirect((env.PUBLIC_ORIGIN||url.origin)+'/?emailChanged=1',303);
   }
   if (method==='POST' && path==='/api/auth/logout') {
     const token=cookieValue(req.headers.get('cookie'),'kn_session');
@@ -230,10 +247,23 @@ async function api(req, env) {
   const user=await requireUser(req,env);
   const isLocal=['localhost','127.0.0.1'].includes(url.hostname);
   if(user.is_banned){
-    const control=await controls(req,env,user);if(control)return control;
+  const control=await controls(req,env,user);if(control)return control;
     error(403,'Dein Konto ist deaktiviert. Du kannst Einspruch einlegen.');
   }
   if(!user.email_verified_at&&!isLocal) error(403,'Bitte bestätige zuerst deine E-Mail-Adresse.');
+  if(method==='POST'&&path==='/api/account/request-email-change'){
+    if(!mailConfigured(env))error(503,'E-Mail-Versand ist nicht eingerichtet.');
+    const d=await bodyLimited(req),next=validateEmail(d.email);
+    if(next===user.email)error(400,'Das ist bereits deine E-Mail-Adresse.');
+    if(await one(env,'SELECT 1 AS found FROM users WHERE email=?',[next]))error(409,'E-Mail-Adresse bereits vergeben.');
+    const last=await one(env,'SELECT created_at AS createdAt FROM account_email_changes WHERE user_id=? ORDER BY created_at DESC LIMIT 1',[user.id]);
+    if(last?.createdAt){const date=Date.parse(String(last.createdAt).replace(' ','T')+'Z');if(Number.isFinite(date)&&Date.now()-date<60000)error(429,'Bitte warte 60 Sekunden, bevor du einen neuen Link anforderst.');}
+    await rateLimit(env,req,'email-change',4,60);
+    const token=randomToken();await main(env,`INSERT INTO account_email_changes(id,user_id,new_email,token_hash,expires_at)
+      VALUES(?,?,?,?,datetime('now','+30 minutes'))`,[crypto.randomUUID(),user.id,next,await digest(token)]);
+    await sendMail(env,{to:next,subject:'Kennely · Neue E-Mail-Adresse bestätigen',text:`Bestätige deine neue E-Mail-Adresse: ${env.PUBLIC_ORIGIN}/api/auth/confirm-email-change?token=${token}\n\nDer Link ist 30 Minuten gültig.`});
+    return json({ok:true,cooldownSeconds:60});
+  }
   const control=await controls(req,env,user);if(control)return control;
   if(method==='GET' && path==='/api/live') {
     if(req.headers.get('Upgrade')?.toLowerCase()!=='websocket') error(426,'WebSocket required.');
@@ -275,6 +305,9 @@ async function api(req, env) {
     await rateLimit(env,req,'member-search',90,10);
     const escaped = query.replace(/[\\%_]/g, ch=>'\\'+ch);
     const rows = (await main(env, `SELECT u.id,u.username,p.display_name,p.birth_date,p.city,p.gender,p.intent,p.bio,p.interests,
+      (SELECT pronouns FROM profile_extras pe WHERE pe.user_id=u.id) AS pronouns,
+      (SELECT CASE WHEN pe.sexuality_visible=1 THEN pe.sexuality ELSE '' END FROM profile_extras pe WHERE pe.user_id=u.id) AS sexuality,
+      (SELECT links_json FROM profile_extras pe WHERE pe.user_id=u.id) AS linksJson,
       (SELECT role FROM team_members t WHERE t.user_id=u.id) AS staff_role,
       (SELECT 1 FROM official_accounts o WHERE o.user_id=u.id) AS official,
       (SELECT ph.id FROM photos ph WHERE ph.user_id=u.id AND ph.status='approved' ORDER BY ph.created_at DESC LIMIT 1) AS photo_id
@@ -298,12 +331,40 @@ async function api(req, env) {
     const photos=(await main(env, `SELECT id FROM photos WHERE user_id=? AND status='approved' ORDER BY created_at DESC LIMIT 6`,[id])).rows.map(p=>p.id);
     return json({profile:{...profile(row), photos}});
   }
+  if(method==='GET'&&path==='/api/profile/extras'){
+    const extra=await one(env,'SELECT pronouns,sexuality,sexuality_visible AS sexualityVisible,links_json AS linksJson FROM profile_extras WHERE user_id=?',[user.id]);
+    return json({extra:extra||{pronouns:'',sexuality:'',sexualityVisible:0,linksJson:'[]'}});
+  }
   if (method==='PATCH' && path==='/api/profile') {
     const d=await bodyLimited(req);
     const bio=clean(d.bio,650), city=clean(d.city,64);
     const gender=clean(d.gender,16), looking=clean(d.lookingFor,16),intent=clean(d.intent,32);
     const interests=[...new Set(Array.isArray(d.interests)?d.interests.map(x=>clean(x,24)).filter(Boolean):[])].slice(0,8);
     if (!['frau','mann','divers','nichtbinaer','sonstiges','keine_angabe'].includes(gender) || !['alle','frauen','maenner','divers'].includes(looking) || !['offen','beziehung','dating','freundschaft'].includes(intent)) error(400,'Profilangaben überprüfen.');
+    if(['pronouns','sexuality','sexualityVisible','links'].some(k=>Object.prototype.hasOwnProperty.call(d,k))){
+      const prevExtra=await one(env,'SELECT pronouns,sexuality,sexuality_visible AS sexualityVisible,links_json AS linksJson FROM profile_extras WHERE user_id=?',[user.id]);
+      const pronouns=String(d.pronouns??prevExtra?.pronouns??'');
+      const sexuality=String(d.sexuality??prevExtra?.sexuality??'');
+      const sexualityVisible=d.sexualityVisible===undefined?!!prevExtra?.sexualityVisible:d.sexualityVisible;
+      const pronounChoices=['','er/ihm','sie/ihr','they/them','er/they','sie/they','alle Pronomen','keine Angabe'];
+      const sexualityChoices=['','gay','lesbisch','bisexuell','pansexuell','asexuell','demisexuell','heterosexuell','queer','questioning','andere','keine Angabe'];
+      if(!pronounChoices.includes(pronouns)||!sexualityChoices.includes(sexuality)||typeof sexualityVisible!=='boolean')error(400,'Pronomen oder Orientierung nicht gültig.');
+      let links=d.links;
+      if(links===undefined){try{links=JSON.parse(prevExtra?.linksJson||'[]')}catch{links=[]}}
+      if(!Array.isArray(links)||links.length>6)error(400,'Maximal sechs Links.');
+      const providers={instagram:['instagram.com'],discord:['discord.com','discord.gg'],tiktok:['tiktok.com'],youtube:['youtube.com','youtu.be'],twitch:['twitch.tv'],github:['github.com'],threads:['threads.net'],x:['x.com'],snapchat:['snapchat.com']};
+      const cleaned=[];
+      for(const l of links){
+        const platform=String(l?.platform||'').toLowerCase(),name=String(l?.url||'');
+        if(!providers[platform]||name.length>240)error(400,'Ungültiger Social-Media-Link.');
+        let uri;try{uri=new URL(name)}catch{error(400,'Bitte vollständige HTTPS-Links eingeben.');}
+        if(uri.protocol!=='https:'||!providers[platform].some(h=>uri.hostname===h||uri.hostname==='www.'+h))error(400,'Der Link passt nicht zur Plattform.');
+        cleaned.push({platform,url:uri.toString()});
+      }
+      await main(env,`INSERT INTO profile_extras(user_id,pronouns,sexuality,sexuality_visible,links_json) VALUES(?,?,?,?,?)
+        ON CONFLICT(user_id) DO UPDATE SET pronouns=excluded.pronouns,sexuality=excluded.sexuality,sexuality_visible=excluded.sexuality_visible,links_json=excluded.links_json,updated_at=CURRENT_TIMESTAMP`,
+        [user.id,pronouns,sexuality,sexualityVisible?1:0,JSON.stringify(cleaned)]);
+    }
     await main(env,`UPDATE profiles SET bio=?,city=?,gender=?,looking_for=?,intent=?,interests=?,visible=?,updated_at=CURRENT_TIMESTAMP WHERE user_id=?`,
       [bio,city,gender,looking,intent,JSON.stringify(interests),d.visible===false?0:1,user.id]);
     return json({ok:true});
@@ -396,6 +457,9 @@ async function api(req, env) {
     const d=await bodyLimited(req), target=String(d.targetId||'');
     if (user.id===target || !/^[\da-f-]{36}$/i.test(target)) error(400,'Ungültige Auswahl.');
     await main(env,'INSERT OR IGNORE INTO blocks(blocker_id,blocked_id) VALUES (?,?)',[user.id,target]);
+    await main(env,`DELETE FROM social_post_likes WHERE
+      (user_id=? AND post_id IN (SELECT id FROM social_posts WHERE user_id=?)) OR
+      (user_id=? AND post_id IN (SELECT id FROM social_posts WHERE user_id=?))`,[user.id,target,target,user.id]);
     return json({ok:true});
   }
   if (method==='GET' && path==='/api/blocks') {
@@ -532,6 +596,9 @@ async function api(req, env) {
       ['DELETE FROM social_post_saves WHERE user_id=? OR post_id IN (SELECT id FROM social_posts WHERE user_id=?)',[user.id,user.id]],
       ['DELETE FROM social_comment_likes WHERE user_id=? OR comment_id IN (SELECT id FROM social_comments WHERE user_id=? OR post_id IN (SELECT id FROM social_posts WHERE user_id=?))',[user.id,user.id,user.id]],
 
+      ['DELETE FROM profile_extras WHERE user_id=?',[user.id]],
+      ['DELETE FROM staff_support_identity WHERE user_id=?',[user.id]],
+      ['DELETE FROM account_email_changes WHERE user_id=?',[user.id]],
       ['DELETE FROM staff_private_review_access WHERE actor_id=? OR target_id=?',[user.id,user.id]],
       ['DELETE FROM social_follow_requests WHERE follower_id=? OR following_id=?',[user.id,user.id]],
       ['DELETE FROM social_story_likes WHERE user_id=? OR story_id IN (SELECT id FROM social_stories WHERE user_id=?)',[user.id,user.id]],
@@ -600,7 +667,7 @@ export default {
       if (url.pathname.startsWith('/api/')) {
         return await api(request,env);
       }
-      const pretty={'/legal/impressum':'/legal/imprint.html','/legal/datenschutz':'/legal/privacy.html','/legal/nutzungsbedingungen':'/legal/terms.html'};
+      const pretty={'/legal/impressum':'/legal/imprint.html','/legal/datenschutz':'/legal/privacy.html','/legal/nutzungsbedingungen':'/legal/terms.html','/registrieren':'/registrieren.html','/hilfe':'/hilfe.html','/legal/beschwerden':'/legal/complaints.html','/legal/regeln':'/legal/rules.html'};
       const asset=await env.ASSETS.fetch(pretty[url.pathname]?new Request(new URL(pretty[url.pathname],url),request):request);
       const headers=new Headers(asset.headers);
       headers.set('X-Content-Type-Options','nosniff');headers.set('Referrer-Policy','strict-origin-when-cross-origin');

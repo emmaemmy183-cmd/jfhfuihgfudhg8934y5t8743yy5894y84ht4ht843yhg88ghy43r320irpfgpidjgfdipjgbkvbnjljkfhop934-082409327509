@@ -8,9 +8,9 @@ function createFakeTurso() {
   const main=new DatabaseSync(':memory:');const media=new DatabaseSync(':memory:');
   return Promise.all([
     readFile(new URL('../db/main.sql',import.meta.url),'utf8'),
-    readFile(new URL('../db/media.sql',import.meta.url),'utf8'),readFile(new URL('../db/social.sql',import.meta.url),'utf8'),readFile(new URL('../db/deutschland.sql',import.meta.url),'utf8'),readFile(new URL('../db/2027_9.sql',import.meta.url),'utf8'),readFile(new URL('../db/2027_10.sql',import.meta.url),'utf8'),readFile(new URL('../db/2027_19.sql',import.meta.url),'utf8')
-  ]).then(([a,b,c,d,e,f,g])=>{
-    main.exec(a);media.exec(b);main.exec(c);main.exec(d);main.exec(e);main.exec(f);main.exec(g);
+    readFile(new URL('../db/media.sql',import.meta.url),'utf8'),readFile(new URL('../db/social.sql',import.meta.url),'utf8'),readFile(new URL('../db/deutschland.sql',import.meta.url),'utf8'),readFile(new URL('../db/2027_9.sql',import.meta.url),'utf8'),readFile(new URL('../db/2027_10.sql',import.meta.url),'utf8'),readFile(new URL('../db/2027_19.sql',import.meta.url),'utf8'),readFile(new URL('../db/2027_21.sql',import.meta.url),'utf8'),readFile(new URL('../db/2027_22.sql',import.meta.url),'utf8')
+  ]).then(([a,b,c,d,e,f,g,h,i])=>{
+    main.exec(a);media.exec(b);main.exec(c);main.exec(d);main.exec(e);main.exec(f);main.exec(g);main.exec(h);main.exec(i);
     const env={TURSO_MAIN_URL:'libsql://main.test',TURSO_MAIN_TOKEN:'token-main',TURSO_MEDIA_URL:'libsql://media.test',TURSO_MEDIA_TOKEN:'token-media',BETA_ACCESS_CODE:'an-example-private-beta-code',REGISTRATION_MODE:'local',LEGACY_DATING_ENABLED:'false',IP_HASH_SECRET:'long-random-abuse-salt-secret',ASSETS:{fetch:()=>new Response('static')}};
     const fakeFetch=async(url, init)=>{
       const database=String(url).includes('main.test')?main:media;
@@ -58,8 +58,10 @@ test('2027.19: Story layout metadata and explicit repost permission',async()=>{
   r=await call(env,'/social/stories','POST',{body:'Eine Story',style:{x:27,y:60,size:32,color:'#ffeeaa',align:'left'}},ca);assert.equal(r.status,201,await r.clone().text());const id=(await r.json()).id;
   let ownStories=await call(env,'/social/stories','GET',null,ca);assert.equal(ownStories.status,200);assert.equal((await ownStories.json()).stories.find(x=>x.id===id).moderationStatus,'pending');
   let strangerStories=await call(env,'/social/stories','GET',null,cb);assert.equal(strangerStories.status,200);assert.equal((await strangerStories.json()).stories.some(x=>x.id===id),false);
-  const persisted=main.prepare('SELECT story_style AS style FROM social_stories WHERE id=?').get(id);assert.deepEqual(JSON.parse(persisted.style),{x:27,y:60,size:32,color:'#ffeeaa',align:'left'});
+  const persisted=main.prepare('SELECT story_style AS style FROM social_stories WHERE id=?').get(id);assert.deepEqual(JSON.parse(persisted.style),{x:27,y:60,size:32,color:'#ffeeaa',align:'left',layers:[]});
   main.prepare("UPDATE content_reviews SET status='approved' WHERE content_type='story' AND content_id=?").run(id);
+  const creatorId=(await(await call(env,'/me','GET',null,ca)).json()).user.id;
+  r=await call(env,'/social/follow','POST',{userId:creatorId},cb);assert.equal(r.status,200);
   r=await call(env,'/social/stories','GET',null,cb);assert.equal(r.status,200);const story=(await r.json()).stories.find(x=>x.id===id);assert.equal(story.allowStoryReposts,1);assert.deepEqual(JSON.parse(story.storyStyle),JSON.parse(persisted.style));
   r=await call(env,'/social/stories/'+id+'/repost','POST',{body:'Tolles Bild'},cb);assert.equal(r.status,201);
   r=await call(env,'/account/privacy/preferences','PATCH',{allowStoryReposts:false},ca);assert.equal(r.status,200);
@@ -109,7 +111,72 @@ test('2027.19: only owner or authorized staff can remove stories, staff removal 
 
 test('2027.19: responsive story composer and posts only, no reels',async()=>{
  const src=await readFile(new URL('../public/social-app.js',import.meta.url),'utf8'),css=await readFile(new URL('../public/ken19-ui.css',import.meta.url),'utf8');
- for(const text of ['kn-story-canvas','knStoryOverlay','knMentionSuggestions','allowStoryReposts','data-review-private','data-story-delete','kn-settings-layout','knSuggestedList'])assert.ok(src.includes(text),text);
+ for(const text of ['kn-story-canvas','knStoryLayers','knMentionSuggestions','allowStoryReposts','data-review-private','data-story-delete','kn-settings-layout','knSuggestedList'])assert.ok(src.includes(text),text);
  for(const text of ['.kn-story-editor','@media(max-width:760px)','.kn-settings-side','.kn-rail-profile'])assert.ok(css.includes(text));
  assert.ok(!src.includes("['reels','"));
+});
+
+test('2027.22: freiwillige Profildaten bleiben privat, Links werden validiert und ungültige Updates ändern nichts',async()=>{
+ const {env,fakeFetch,main,media}=await createFakeTurso(),old=globalThis.fetch;globalThis.fetch=fakeFetch;
+ try{
+  let r=await call(env,'/auth/register','POST',register('Profiltest','profileextra@local.test'));assert.equal(r.status,201);const ownerCookie=r.headers.get('set-cookie').split(';')[0];
+  r=await call(env,'/auth/register','POST',register('Zuschauer','profileviewer@local.test'));assert.equal(r.status,201);const viewerCookie=r.headers.get('set-cookie').split(';')[0];
+  const owner=(await(await call(env,'/me','GET',null,ownerCookie)).json()).user;
+  const base={bio:'Meine Momente',city:'Köln',gender:'divers',lookingFor:'alle',intent:'freundschaft',interests:[],visible:true,pronouns:'er/ihm',sexuality:'gay',sexualityVisible:false};
+  r=await call(env,'/profile','PATCH',{...base,city:'Berlin',links:[{platform:'instagram',url:'https://example.com/fake'}]},ownerCookie);assert.equal(r.status,400);
+  assert.equal(main.prepare('SELECT city FROM profiles WHERE user_id=?').get(owner.id).city,'Köln');
+  r=await call(env,'/profile','PATCH',{...base,links:[{platform:'instagram',url:'https://www.instagram.com/a_real_user/'}]},ownerCookie);assert.equal(r.status,200,await r.clone().text());
+  r=await call(env,'/profile/extras','GET',null,ownerCookie);let personal=(await r.json()).extra;assert.equal(personal.sexuality,'gay');assert.equal(personal.sexualityVisible,0);
+  r=await call(env,`/social/profiles/${owner.id}`,'GET',null,viewerCookie);let publicData=(await r.json()).profile;assert.equal(publicData.sexuality,'');assert.equal(publicData.pronouns,'er/ihm');assert.equal(publicData.links.length,1);
+  r=await call(env,'/profile','PATCH',{...base,sexualityVisible:true,links:[]},ownerCookie);assert.equal(r.status,200);
+  r=await call(env,`/social/profiles/${owner.id}`,'GET',null,viewerCookie);assert.equal((await r.json()).profile.sexuality,'gay');
+ }finally{globalThis.fetch=old;main.close();media.close()}
+});
+
+test('2027.22: Mehrfach-Storytexte und Story-Like bleiben erhalten, Home zeigt nur gefolgte Storys',async()=>{
+ const {env,fakeFetch,main,media}=await createFakeTurso(),old=globalThis.fetch;globalThis.fetch=fakeFetch;
+ try{
+  let r=await call(env,'/auth/register','POST',register('Storyartist','artiststory@local.test'));const ca=r.headers.get('set-cookie').split(';')[0];const a=(await(await call(env,'/me','GET',null,ca)).json()).user;
+  r=await call(env,'/auth/register','POST',register('Storyfan','fanstory@local.test'));const cb=r.headers.get('set-cookie').split(';')[0];
+  const layers=[{text:'Hallo @fanstory',x:25,y:40,rotate:-16,size:25,scale:125,color:'#ffffff'},{text:'Zweiter Text',x:75,y:75,rotate:37,size:32,scale:90,color:'#ffeeaa'}];
+  r=await call(env,'/social/stories','POST',{body:'Hallo Welt',style:{zoom:125,layers}},ca);assert.equal(r.status,201,await r.clone().text());const id=(await r.json()).id;
+  let persisted=JSON.parse(main.prepare('SELECT story_style AS style FROM social_stories WHERE id=?').get(id).style);
+  assert.equal(persisted.layers.length,2);assert.equal(persisted.layers[0].rotate,-16);
+  main.prepare("UPDATE content_reviews SET status='approved' WHERE content_type='story' AND content_id=?").run(id);
+  r=await call(env,'/social/stories','GET',null,cb);assert.equal((await r.json()).stories.some(x=>x.id===id),false);
+  r=await call(env,'/social/follow','POST',{userId:a.id},cb);assert.equal(r.status,200,await r.clone().text());
+  r=await call(env,'/social/stories','GET',null,cb);assert.equal((await r.json()).stories.some(x=>x.id===id),true);
+  r=await call(env,`/social/stories/${id}/like`,'POST',{},cb);assert.equal((await r.json()).liked,true);
+  r=await call(env,'/social/stories','GET',null,cb);assert.equal(!!(await r.json()).stories.find(x=>x.id===id).liked,true);
+  r=await call(env,`/social/stories/${id}/like`,'POST',{},cb);assert.equal((await r.json()).liked,false);
+  r=await call(env,'/social/stories','GET',null,cb);assert.equal(!!(await r.json()).stories.find(x=>x.id===id).liked,false);
+ }finally{globalThis.fetch=old;main.close();media.close()}
+});
+
+test('2027.22: Support-Klarnamen sind auf Antworten beschränkt; CEO kann Mitarbeiter-Namen setzen',async()=>{
+ const {env,fakeFetch,main,media}=await createFakeTurso(),old=globalThis.fetch;globalThis.fetch=fakeFetch;
+ try{
+  let r=await call(env,'/auth/register','POST',register('Chef','supportchief@local.test'));const ceoCookie=r.headers.get('set-cookie').split(';')[0];const ceo=(await(await call(env,'/me','GET',null,ceoCookie)).json()).user;
+  r=await call(env,'/auth/register','POST',register('Kollege','supportstaffer@local.test'));const staffCookie=r.headers.get('set-cookie').split(';')[0];const staf=(await(await call(env,'/me','GET',null,staffCookie)).json()).user;
+  r=await call(env,'/auth/register','POST',register('Kunde','supportcustomer@local.test'));const userCookie=r.headers.get('set-cookie').split(';')[0];
+  main.prepare("INSERT INTO team_members(user_id,role) VALUES(?,'owner')").run(ceo.id);
+  main.prepare("INSERT INTO team_members(user_id,role) VALUES(?,'support')").run(staf.id);
+  r=await call(env,'/support/identity','PATCH',{userId:staf.id,supportName:'Voller Mitarbeitername'},staffCookie);assert.equal(r.status,403);
+  r=await call(env,'/support/identity','PATCH',{userId:staf.id,supportName:'Voller Mitarbeitername'},ceoCookie);assert.equal(r.status,200,await r.clone().text());
+  r=await call(env,'/support','POST',{category:'technical',subject:'Problem mit Benachrichtigungen',body:'Benachrichtigungen kommen im Test nicht an.'},userCookie);assert.equal(r.status,201,await r.clone().text());const ticketId=(await r.json()).id;
+  r=await call(env,`/support/${ticketId}/reply`,'POST',{body:'Ich prüfe die Ursache und melde mich.'},staffCookie);assert.equal(r.status,200,await r.clone().text());
+  r=await call(env,`/support/${ticketId}`,'GET',null,userCookie);const replies=(await r.json()).replies;const answer=replies.find(x=>x.authorId===staf.id);assert.equal(answer.supportName,'Voller Mitarbeitername');assert.equal(answer.role,'support');assert.equal(answer.official,1);
+  r=await call(env,`/social/profiles/${staf.id}`,'GET',null,userCookie);assert.ok(!JSON.stringify((await r.json()).profile).includes('Voller Mitarbeitername'));
+ }finally{globalThis.fetch=old;main.close();media.close()}
+});
+
+test('2027.22: Suchmaschinen-Metadaten und öffentliche Rechts-/Hilfeseiten sind vorhanden',async()=>{
+ const html=await readFile(new URL('../public/index.html',import.meta.url),'utf8');
+ const robots=await readFile(new URL('../public/robots.txt',import.meta.url),'utf8');
+ const sitemap=await readFile(new URL('../public/sitemap.xml',import.meta.url),'utf8');
+ const code=await readFile(new URL('../src/server/index.js',import.meta.url),'utf8');
+ assert.match(html,/google-site-verification/);assert.match(html,/href="\/legal\/datenschutz"/);assert.match(html,/href="\/registrieren"/);
+ assert.match(robots,/Sitemap: https:\/\/kennely\.de\/sitemap\.xml/);
+ assert.match(sitemap,/https:\/\/kennely\.de\/registrieren/);
+ assert.match(code,/\/legal\/beschwerden/);
 });

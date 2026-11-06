@@ -8,9 +8,9 @@ function createFakeTurso() {
   const main=new DatabaseSync(':memory:');const media=new DatabaseSync(':memory:');
   return Promise.all([
     readFile(new URL('../db/main.sql',import.meta.url),'utf8'),
-    readFile(new URL('../db/media.sql',import.meta.url),'utf8'),readFile(new URL('../db/social.sql',import.meta.url),'utf8'),readFile(new URL('../db/deutschland.sql',import.meta.url),'utf8'),readFile(new URL('../db/2027_9.sql',import.meta.url),'utf8'),readFile(new URL('../db/2027_10.sql',import.meta.url),'utf8'),readFile(new URL('../db/2027_19.sql',import.meta.url),'utf8')
-  ]).then(([a,b,c,d,e,f,g])=>{
-    main.exec(a);media.exec(b);main.exec(c);main.exec(d);main.exec(e);main.exec(f);main.exec(g);
+    readFile(new URL('../db/media.sql',import.meta.url),'utf8'),readFile(new URL('../db/social.sql',import.meta.url),'utf8'),readFile(new URL('../db/deutschland.sql',import.meta.url),'utf8'),readFile(new URL('../db/2027_9.sql',import.meta.url),'utf8'),readFile(new URL('../db/2027_10.sql',import.meta.url),'utf8'),readFile(new URL('../db/2027_19.sql',import.meta.url),'utf8'),readFile(new URL('../db/2027_21.sql',import.meta.url),'utf8'),readFile(new URL('../db/2027_22.sql',import.meta.url),'utf8')
+  ]).then(([a,b,c,d,e,f,g,h,i])=>{
+    main.exec(a);media.exec(b);main.exec(c);main.exec(d);main.exec(e);main.exec(f);main.exec(g);main.exec(h);main.exec(i);
     const env={TURSO_MAIN_URL:'libsql://main.test',TURSO_MAIN_TOKEN:'token-main',TURSO_MEDIA_URL:'libsql://media.test',TURSO_MEDIA_TOKEN:'token-media',BETA_ACCESS_CODE:'an-example-private-beta-code',REGISTRATION_MODE:'local',LEGACY_DATING_ENABLED:'true',IP_HASH_SECRET:'long-random-abuse-salt-secret',ASSETS:{fetch:()=>new Response('static')}};
     const fakeFetch=async(url, init)=>{
       const database=String(url).includes('main.test')?main:media;

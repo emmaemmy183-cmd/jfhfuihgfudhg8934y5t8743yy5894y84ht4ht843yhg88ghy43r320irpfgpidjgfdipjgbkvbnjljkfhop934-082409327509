@@ -1,0 +1,5 @@
+Google Search Console DNS-TXT für kennely.de:
+Name/Host: @ (oder leer, je nach DNS-Oberfläche)
+Typ: TXT
+Wert: google-site-verification=xRFaT-Pbhld_bCdE5uUFru7y6ownGNSYN4ql4j4-Nvs
+Wichtig: Das gehört bei one.com in DNS, nicht als A/CNAME/CAA!

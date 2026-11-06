@@ -1,3 +1,7 @@
+# Kennely 2027.22 – Vollständige Render-Version
+
+**Aktuelle Anleitung:** [`UPDATE_2027_22_RENDER.md`](UPDATE_2027_22_RENDER.md). Dieses Paket enthält die vollständige Website, Render-Node-Server, Turso-Skripte, Support, Moderation und SEO-Seiten.
+
 # Kennely 2027.20 · Vollständiges Netlify-Projekt
 
 Neue Hinweise: [UPDATE_2027_20.md](UPDATE_2027_20.md)

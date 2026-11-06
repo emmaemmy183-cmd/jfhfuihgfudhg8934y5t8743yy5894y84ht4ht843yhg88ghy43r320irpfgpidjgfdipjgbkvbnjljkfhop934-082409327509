@@ -35,7 +35,7 @@ test('2027.20: saved/activity are compact galleries with post-detail click',asyn
 });
 test('2027.20: story text can be moved, image zoomed, zoom metadata validated server side',async()=>{
  const src=await source('../public/social-app.js'),social=await source('../src/server/social.js');
- for(const part of ['pointerdown','pointermove','imageZoom','attachStoryDragging','storyImageZoom','setPointerCapture','textX','textY'])assert.ok(src.includes(part),part);
+ for(const part of ['pointerdown','pointermove','imageZoom','attachStoryDragging','storyImageZoom','setPointerCapture','storyLayers','textRotate','textScale'])assert.ok(src.includes(part),part);
  assert.match(social,/style\.zoom=n\(raw\.zoom,100,200,100\)/);
  assert.ok(!src.includes('AudioContext'));
 });

@@ -1,2 +1,10 @@
 User-agent: *
+Allow: /
 Disallow: /api/
+Disallow: /nachrichten
+Disallow: /team
+Disallow: /einstellungen
+Disallow: /profil/
+Disallow: /gespeichert
+Disallow: /aktivitaeten
+Sitemap: https://kennely.de/sitemap.xml

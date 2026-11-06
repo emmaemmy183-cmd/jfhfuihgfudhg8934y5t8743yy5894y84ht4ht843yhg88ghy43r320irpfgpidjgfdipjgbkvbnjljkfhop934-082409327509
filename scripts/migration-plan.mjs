@@ -9,6 +9,8 @@ export const MIGRATION_FILES = Object.freeze([
   ['main','db/2027_10.sql'],
   ['main','db/2027_12.sql'],
   ['main','db/2027_19.sql'],
+  ['main','db/2027_21.sql'],
+  ['main','db/2027_22.sql'],
 ]);
 
 /** Files contain simple DDL (no triggers/compound SQL).

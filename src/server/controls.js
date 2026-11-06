@@ -12,7 +12,8 @@ async function parse(req){if(!req.headers.get('content-type')?.startsWith('appli
 async function log(env,actor,action,target,details=''){await main(env,'INSERT INTO admin_audit(id,actor_id,action,target_id,details) VALUES(?,?,?,?,?)',[uid(),actor,action,target,details]);}
 const CAPS={
  'private.profile.review':2,'user.inspect':3,'identity.edit':3,'badge.manage':3,'account.suspend':4,'account.delete':5,
- 'team.manage':5,'permissions.manage':5,'terms.manage':4,'labels.manage':5,'labels.self':1,'audit.view':4,'media.review':2,'reports.review':2
+ 'team.manage':5,'permissions.manage':5,'terms.manage':4,'labels.manage':5,'labels.self':1,'audit.view':4,'media.review':2,'reports.review':2,
+ 'account.warn':2,'account.restrict':3,'support.reply':1
 };
 export const CAPABILITIES=Object.freeze(Object.keys(CAPS));
 export async function allowed(env,user,cap){
@@ -75,6 +76,9 @@ export async function controls(req,env,user){
  if(method==='PATCH'&&path==='/api/account/privacy'){
   const d=await parse(req);if(typeof d.isPrivate!=='boolean')throwHttp(400,'Ungültige Privatsphäre-Einstellung.');
   await main(env,'UPDATE profiles SET is_private=?,updated_at=CURRENT_TIMESTAMP WHERE user_id=?',[d.isPrivate?1:0,user.id]);
+  if(d.isPrivate){await main(env,`DELETE FROM social_post_likes WHERE post_id IN
+     (SELECT id FROM social_posts WHERE user_id=?) AND user_id<>? AND user_id NOT IN
+     (SELECT follower_id FROM social_follows WHERE following_id=?)`,[user.id,user.id,user.id]);}
   if(!d.isPrivate) {
     // Do not silently approve pending follower requests. User must accept individually.
   }
@@ -151,6 +155,19 @@ export async function controls(req,env,user){
   const roleRules=(await main(env,'SELECT role,capability,enabled FROM role_permissions ORDER BY role,capability LIMIT 300')).rows;
   const individual=(await main(env,`SELECT s.user_id AS userId,u.username,s.capability,s.enabled FROM staff_permissions s JOIN users u ON u.id=s.user_id ORDER BY u.username,s.capability LIMIT 200`)).rows;
   return out({capabilities:CAPABILITIES,roleRules,individual,defaults:CAPS});
+ }
+ if(method==='POST'&&path==='/api/admin/permissions/batch'){
+  await need(env,user,'permissions.manage');const d=await parse(req);
+  const caps=[...new Set(Array.isArray(d.capabilities)?d.capabilities:[])];
+  if(!caps.length||caps.length>CAPABILITIES.length||caps.some(c=>!CAPABILITIES.includes(c)))throwHttp(400,'Ungültige Berechtigungen.');
+  if(caps.some(c=>['permissions.manage','team.manage','account.delete'].includes(c)))throwHttp(403,'CEO-Befugnisse sind nicht delegierbar.');
+  if(typeof d.enabled!=='boolean')throwHttp(400,'Status fehlt.');
+  const role=String(d.role||'');let target=null;
+  if(d.userId){target=idGuard(d.userId);const t=await one(env,'SELECT role FROM team_members WHERE user_id=?',[target]);if(!t||t.role==='owner')throwHttp(403,'Ungültiges Teammitglied.');}
+  else if(!['admin','manager','moderator','support'].includes(role))throwHttp(400,'Ungültige Rolle.');
+  for(const cap of caps){if(target){await main(env,'INSERT INTO staff_permissions(user_id,capability,enabled) VALUES(?,?,?) ON CONFLICT(user_id,capability) DO UPDATE SET enabled=excluded.enabled',[target,cap,d.enabled?1:0]);}
+   else await main(env,'INSERT INTO role_permissions(role,capability,enabled) VALUES(?,?,?) ON CONFLICT(role,capability) DO UPDATE SET enabled=excluded.enabled',[role,cap,d.enabled?1:0]);}
+  await log(env,user.id,'permission_batch',target||role,`${caps.join(', ')} → ${d.enabled?'erlaubt':'verweigert'}`);return out({ok:true,changed:caps.length});
  }
  if(method==='POST'&&path==='/api/admin/permissions'){
   await need(env,user,'permissions.manage');const d=await parse(req);const role=String(d.role||''),cap=String(d.capability||'');

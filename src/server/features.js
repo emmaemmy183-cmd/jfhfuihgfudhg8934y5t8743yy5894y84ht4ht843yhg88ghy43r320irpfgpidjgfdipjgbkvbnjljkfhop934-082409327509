@@ -67,23 +67,39 @@ export async function features(req,env,user){const url=new URL(req.url),p=url.pa
  if(m==='POST'&&p==='/api/support'){
   const recent=await one(env,"SELECT COUNT(*) AS n FROM support_tickets WHERE user_id=? AND created_at>datetime('now','-1 hour')",[user.id]);if(Number(recent?.n)>=6)fail(429,'Please try again later.');
   const d=await data(req),category=clean(d.category,32),subject=clean(d.subject,110),body=clean(d.body,3000);
-  if(!['account','safety','verification','technical','privacy','other'].includes(category)||subject.length<5||body.length<10)fail(400,'Please complete the request.');
+  if(!['account','safety','verification','technical','privacy','payment','login','harassment','content','appeal','other'].includes(category)||subject.length<5||body.length<10)fail(400,'Please complete the request.');
   const id=uid();await main(env,'INSERT INTO support_tickets(id,user_id,category,subject) VALUES(?,?,?,?)',[id,user.id,category,subject]);
-  await main(env,'INSERT INTO support_replies(id,ticket_id,author_id,body) VALUES(?,?,?,?)',[uid(),id,user.id,body]);return json({ok:true,id},201);
+  await main(env,'INSERT INTO support_replies(id,ticket_id,author_id,body) VALUES(?,?,?,?)',[uid(),id,user.id,body]);
+  return json({ok:true,id},201);
  }
  if(p.startsWith('/api/support/')&&!p.endsWith('/reply')&&m==='GET'){
   const id=routeId(p,'/api/support/');const t=await one(env,'SELECT * FROM support_tickets WHERE id=?',[id]);if(!t)fail(404,'Request not found.');
   if(t.user_id!==user.id&&roleLevel(user.role)<1)fail(403,'Not permitted.');
-  const replies=(await main(env,'SELECT r.id,r.body,r.created_at AS createdAt,p.display_name AS author FROM support_replies r JOIN profiles p ON p.user_id=r.author_id WHERE r.ticket_id=? ORDER BY r.created_at ASC LIMIT 200',[id])).rows;return json({ticket:t,replies});
+  const replies=(await main(env,`SELECT r.id,r.body,r.author_id AS authorId,r.created_at AS createdAt,p.display_name AS author,u.username,
+  t.role AS role,CASE WHEN t.role IS NOT NULL THEN COALESCE(NULLIF(si.display_name,''),p.display_name,u.username) ELSE NULL END AS supportName,
+  CASE WHEN t.role IS NOT NULL THEN 1 ELSE 0 END AS official,
+  (SELECT ph.id FROM photos ph WHERE ph.user_id=u.id AND ph.status='approved' ORDER BY ph.created_at DESC LIMIT 1) AS photoId
+  FROM support_replies r JOIN profiles p ON p.user_id=r.author_id JOIN users u ON u.id=r.author_id
+  LEFT JOIN team_members t ON t.user_id=r.author_id LEFT JOIN staff_support_identity si ON si.user_id=r.author_id WHERE r.ticket_id=? ORDER BY r.created_at ASC LIMIT 200`,[id])).rows;
+  return json({ticket:t,replies});
  }
  if(p.startsWith('/api/support/')&&p.endsWith('/reply')&&m==='POST'){
   const id=p.split('/')[3],t=await one(env,'SELECT * FROM support_tickets WHERE id=?',[id]);if(!t)fail(404,'Request not found.');
   const staff=roleLevel(user.role)>=1;if(t.user_id!==user.id&&!staff)fail(403,'Not permitted.');
   const d=await data(req),body=clean(d.body,3000);if(body.length<2)fail(400,'Reply too short.');
   await main(env,'INSERT INTO support_replies(id,ticket_id,author_id,body) VALUES(?,?,?,?)',[uid(),id,user.id,body]);
+  if(staff){await main(env,'UPDATE support_tickets SET assigned_to=? WHERE id=?',[user.id,id]);await audit(env,user.id,'support_replied',id,'Supportanfrage beantwortet');}
   await main(env,'UPDATE support_tickets SET status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?',[staff?'waiting':'open',id]);
   if(staff&&t.user_id!==user.id)await notify(env,t.user_id,'support','Support replied',t.subject,user.id);
   return json({ok:true});
+ }
+ if(m==='PATCH'&&p==='/api/support/identity'){
+  if(user.role!=='owner')fail(403,'Nur der CEO kann Support-Namen festlegen.');const d=await data(req);const name=clean(d.supportName,80);
+  if(name.length<3)fail(400,'Bitte einen Support-Anzeigenamen mit mindestens drei Zeichen angeben.');
+  if(user.role!=='owner'&&d.userId&&d.userId!==user.id)fail(403,'Nur der CEO darf den Namen anderer Mitarbeiter festlegen.');
+  const id=d.userId?guardId(d.userId):user.id;
+  if(!await getRole(env,id))fail(404,'Teammitglied nicht gefunden.');
+  await main(env,`INSERT INTO staff_support_identity(user_id,display_name) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET display_name=excluded.display_name,updated_at=CURRENT_TIMESTAMP`,[id,name]);await audit(env,user.id,'support_name_updated',id,'Support-Anzeigename bearbeitet');return json({ok:true});
  }
  if(m==='PATCH'&&p.startsWith('/api/support/')){
   requireStaff(user,'support');const id=routeId(p,'/api/support/'),d=await data(req);
@@ -91,7 +107,7 @@ export async function features(req,env,user){const url=new URL(req.url),p=url.pa
   await main(env,'UPDATE support_tickets SET status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?',[d.status,id]);await audit(env,user.id,'support_status',id,d.status);return json({ok:true});
  }
  if(m==='GET'&&p==='/api/account/export'){
-  const profile=await one(env,'SELECT * FROM profiles WHERE user_id=?',[user.id]);const settings=await one(env,'SELECT * FROM user_preferences WHERE user_id=?',[user.id]);
+  const profile=await one(env,'SELECT * FROM profiles WHERE user_id=?',[user.id]);const profileExtras=await one(env,'SELECT pronouns,sexuality,sexuality_visible,links_json FROM profile_extras WHERE user_id=?',[user.id]);const settings=await one(env,'SELECT * FROM user_preferences WHERE user_id=?',[user.id]);
   const matches=(await main(env,'SELECT * FROM matches WHERE user_a=? OR user_b=?',[user.id,user.id])).rows;
   const messages=(await main(env,'SELECT id,match_id,sender_id,body,created_at FROM messages WHERE sender_id=? ORDER BY created_at DESC LIMIT 10000',[user.id])).rows;
   const likes=(await main(env,'SELECT * FROM likes WHERE from_user=?',[user.id])).rows;
@@ -104,7 +120,7 @@ export async function features(req,env,user){const url=new URL(req.url),p=url.pa
    directMessages:(await main(env,'SELECT id,thread_id,body,created_at FROM social_dms WHERE sender_id=? LIMIT 10000',[user.id])).rows,
    reports:(await main(env,'SELECT * FROM social_reports WHERE reporter_id=? LIMIT 10000',[user.id])).rows
   };
-  const out={exportedAt:new Date().toISOString(),account:{id:user.id,email:user.email},profile,settings,matches,messages,likes,reports,social,note:'Partial export with per-table limits. Image bytes and some retained records require a separate access request to privacy support.'};
+  const out={exportedAt:new Date().toISOString(),account:{id:user.id,email:user.email},profile,profileExtras,settings,matches,messages,likes,reports,social,note:'Partial export with per-table limits. Image bytes and some retained records require a separate access request to privacy support.'};
   return json(out,200,{'content-disposition':'attachment; filename="kennely-data.json"'});
  }
  if(m==='POST'&&p==='/api/account/logout-all'){
@@ -162,26 +178,29 @@ export async function features(req,env,user){const url=new URL(req.url),p=url.pa
  if(m==='GET'&&p==='/api/admin/audit'){
   if(!await allowed(env,user,'audit.view'))fail(403,'Keine Berechtigung.');const rows=(await main(env,`SELECT a.id,a.action,a.target_id AS targetId,a.details,a.created_at AS createdAt,
     u.username AS actorUsername,p.display_name AS actorName,
+    (SELECT username FROM users target WHERE target.id=a.target_id) AS targetUsername,
     (SELECT 1 FROM official_accounts o WHERE o.user_id=a.actor_id) AS official,
     (SELECT ph.id FROM photos ph WHERE ph.user_id=a.actor_id AND ph.status='approved' ORDER BY ph.created_at DESC LIMIT 1) AS photoId
     FROM admin_audit a LEFT JOIN users u ON u.id=a.actor_id LEFT JOIN profiles p ON p.user_id=a.actor_id
     ORDER BY a.created_at DESC LIMIT 75`)).rows;return json({audit:rows});
  }
  if(m==='POST'&&p==='/api/admin/moderate'){
-  requireStaff(user,'moderator');const d=await data(req),target=guardId(d.userId),action=String(d.action||''),reason=clean(d.reason,500);
+  const d=await data(req),target=guardId(d.userId),action=String(d.action||''),reason=clean(d.reason,500);
+  const cap=action==='ban'||action==='unban'?'account.suspend':action==='restrict'?'account.restrict':'account.warn';
+  if(!await allowed(env,user,cap))fail(403,'Diese Maßnahme ist für deine Rolle nicht freigegeben.');
   if(reason.length<8)fail(400,'Bitte gib eine Begründung mit mindestens 8 Zeichen ein.');await userExists(env,target);
   const role=await getRole(env,target);if(roleLevel(role)>=roleLevel(user.role))fail(403,'Cannot moderate equal or higher team roles.');
   if(action==='warning'){
    await main(env,'INSERT INTO moderation_warnings(id,target_id,actor_id,reason) VALUES(?,?,?,?)',[uid(),target,user.id,reason]);
    await notify(env,target,'warning','Community warning',reason,user.id);
   } else if(action==='restrict'){
-   requireStaff(user,'manager');const feature=String(d.feature||'');if(!['chat','likes','matching'].includes(feature))fail(400,'Invalid feature.');
+   const feature=String(d.feature||'');if(!['chat','likes','matching'].includes(feature))fail(400,'Invalid feature.');
    const days=Math.max(1,Math.min(365,Math.floor(Number(d.days)||1)));
    await main(env,`INSERT INTO user_restrictions(id,user_id,feature,reason,until_at,imposed_by) VALUES(?,?,?,?,datetime('now',?),?)`,[uid(),target,feature,reason,`+${days} days`,user.id]);
    await notify(env,target,'restriction','Feature restricted',`${feature}: ${reason}`,user.id);
   } else if(action==='ban' || action==='unban'){
    if(!await allowed(env,user,'account.suspend'))fail(403,'Keine Berechtigung.');
-   if(action==='ban')await suspendWithReason(env,user,target,reason,String(d.ruleId||'community'));
+   if(action==='ban'){const rule=String(d.ruleId||'community');if(!['community','harassment','hate','spam','impersonation','sexual-minors','illegal-content','privacy','other'].includes(rule))fail(400,'Bitte eine gültige Regel auswählen.');await suspendWithReason(env,user,target,reason,rule);}
    else await reinstate(env,user,target,reason);
   } else fail(400,'Unknown action.');
   let emailSent=false,emailError=null;

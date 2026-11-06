@@ -1,0 +1,74 @@
+/* Kennely 2027.22: responsive, accessible new profile / support / moderation surfaces. */
+:root {--kn-outline:color-mix(in srgb,var(--accent) 40%, transparent)}
+body {overflow-x:clip}
+button, a, label, select, textarea, input { -webkit-tap-highlight-color:transparent }
+button, a {touch-action:manipulation}
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {outline:2px solid var(--accent);outline-offset:2px}
+#modal:has(.kn-profile-edit), #modal:has(.kn-support-chat) {width:min(98vw,760px);max-width:760px;max-height:min(94dvh,900px);}
+#modal:has(.kn-support-chat) .modal-shell {height:min(85dvh,800px);overflow:hidden;display:flex;flex-direction:column;padding:0!important}
+#modal:has(.kn-support-chat) #modalBody {height:100%;min-height:0;display:flex;flex-direction:column;padding:0!important}
+#modal:has(.kn-support-chat) #closeModal {z-index:10;top:13px;right:14px}
+.kn-support-chat {height:100%;width:100%;min-height:0;display:flex;flex-direction:column;border-radius:16px;overflow:hidden}
+.kn-support-chat-header {display:flex;gap:12px;align-items:center;padding:19px 56px 17px 19px;border-bottom:1px solid var(--line);flex-shrink:0}
+.kn-support-chat-header div:nth-child(2) {min-width:0;display:grid;gap:4px}
+.kn-support-chat-header small {font-size:12px;color:var(--muted)}
+.kn-support-mark {flex-shrink:0;display:grid;place-items:center;width:46px;height:46px;border-radius:50%;font-size:25px;font-weight:900;color:white;background:linear-gradient(140deg,#4d27bc,#a345ee)}
+.kn-support-chat-header .verified svg {width:14px;height:14px}
+.kn-support-messages {flex:1;overflow-y:auto;overscroll-behavior:contain;min-height:0;padding:18px 18px 32px;display:flex;flex-direction:column;gap:14px;scrollbar-gutter:stable}
+.kn-support-message {display:flex;align-items:flex-end;gap:7px;max-width:85%}
+.kn-support-message.mine {align-self:flex-end;flex-direction:row-reverse}
+.kn-support-message.staff {align-self:flex-start}
+.kn-support-avatar .avatar {width:34px;height:34px;flex:0 0 34px}
+.kn-support-message-body {min-width:0;max-width:100%;padding:12px 13px;border-radius:16px 16px 16px 5px;background:var(--surface2);overflow-wrap:anywhere}
+.kn-support-message.mine .kn-support-message-body {background:var(--accent);color:white;border-radius:16px 16px 5px 16px}
+.kn-support-message-body p {margin:4px 0 8px;white-space:pre-wrap;line-height:1.45;font-size:14px}
+.kn-support-message-body time {font-size:10px;opacity:.75}
+.kn-support-person {display:flex;gap:7px;flex-wrap:wrap;align-items:center;font-size:12px}
+.kn-support-person svg {color:#45a8ff;width:15px;height:15px}
+.kn-support-person span {font-size:11px;color:var(--muted)}
+.kn-support-compose {display:flex;align-items:flex-end;gap:10px;padding:13px 18px max(13px,env(safe-area-inset-bottom));border-top:1px solid var(--line);flex-shrink:0}
+.kn-support-compose textarea {flex:1;min-width:0;min-height:47px;max-height:135px;resize:vertical;border-radius:14px!important;font-size:16px!important}
+.kn-support-compose button {flex:0 0 auto;min-height:46px}
+.kn-profile-edit {display:grid;gap:16px;padding:5px;max-width:100%;}
+.kn-edit-photo {display:flex;gap:16px;align-items:center}.kn-edit-photo .avatar {width:76px;height:76px}
+.kn-edit-identity {border:1px solid var(--line);border-radius:15px;padding:14px;background:var(--surface2);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.kn-edit-identity strong {font-size:16px}.kn-edit-identity small {font-size:11px;color:var(--muted);flex:1;min-width:170px}
+.kn-profile-edit .kn-edit-row {display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:11px}
+.kn-profile-edit .kn-edit-row .field {min-width:0}.kn-profile-edit input,.kn-profile-edit select,.kn-profile-edit textarea {width:100%;min-width:0}
+.kn-profile-edit h3 {font-size:16px;margin:12px 0 0}
+.kn-switch-row {padding:14px;display:flex;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:14px;gap:14px;cursor:pointer;background:var(--surface2)}
+.kn-switch-row>span {font-weight:700}.kn-switch-row small {display:block;margin-top:4px;color:var(--muted);font-size:11px;font-weight:500}
+.kn-switch-row input[type=checkbox] {appearance:none;position:relative;width:48px!important;min-width:48px;height:27px;flex:0 0 48px;border:0;border-radius:30px;background:#777783;transition:background-color .15s ease;cursor:pointer}
+.kn-switch-row input[type=checkbox]::after {content:'';position:absolute;top:3px;left:3px;height:21px;width:21px;border-radius:50%;background:white;transition:transform .15s ease;box-shadow:0 1px 4px #0006}
+.kn-switch-row input[type=checkbox]:checked {background:var(--accent)}.kn-switch-row input[type=checkbox]:checked::after {transform:translateX(21px)}
+.kn-label-stack,.kn-social-links {display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
+.kn-profile-label,.kn-author-label {padding:4px 10px;border-radius:25px;font-size:11px;font-weight:800;border:1px solid var(--kn-outline);background:color-mix(in srgb,var(--accent) 13%,var(--surface2));color:var(--text)}
+.kn-profile-label[data-color=gold] {background:#6a4c15;color:#fff5d1}.kn-profile-label[data-color=blue] {background:#17386b;color:#d4eaff}.kn-profile-label[data-color=green] {background:#17513a;color:#d9ffef}
+.kn-social-links a {font-size:12px;padding:5px 11px;border:1px solid var(--line);border-radius:12px;text-decoration:none;color:var(--accent)}
+.kn-avatar-story-link,.kn-avatar-profile-link {border:0;outline:0;background:none;border-radius:100%;padding:2px;cursor:pointer;flex:0 0 auto}
+.kn-avatar-story-link {background:conic-gradient(#d52ca9,#7b44fc,#b629a9,#d52ca9)}
+.kn-avatar-story-link .avatar {display:block;border:2px solid var(--surface)}
+.kn-delivery-status {align-self:flex-end;font-size:10px;color:var(--muted);padding:1px 4px 0;display:block}
+.kn-permissions-checklist {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 12px;border:1px solid var(--line);border-radius:14px;padding:14px;max-height:300px;overflow:auto;min-width:0}
+.kn-permissions-checklist legend {font-weight:800;padding:0 8px}
+.kn-permissions-checklist label {min-width:0;font-size:12px;text-wrap:wrap}
+.kn-permissions-checklist label span {overflow-wrap:anywhere}
+.kn-verify-panel {max-width:540px;margin:5vh auto;padding:28px!important}
+.kn-help-login {display:block;margin:12px auto;text-align:center;font-size:13px;color:var(--accent)}
+.settings-grid .setting-priority {min-width:0}
+.privacy-switch input[role=switch] {width:40px;min-width:40px;height:24px;accent-color:var(--accent)}
+@media(max-width:900px){.kn-profile-edit .kn-edit-row {grid-template-columns:1fr}.kn-permissions-checklist {grid-template-columns:1fr}}
+@media(max-width:760px){
+ #modal:has(.kn-support-chat) {width:100vw!important;max-width:100vw!important;max-height:100dvh!important;height:100dvh!important;border-radius:0!important}
+ #modal:has(.kn-support-chat) .modal-shell {height:100dvh!important;max-height:100dvh!important;border-radius:0!important}
+ .kn-support-chat-header {padding-top:max(17px,env(safe-area-inset-top))}
+ .kn-support-messages {padding:14px 12px 24px}
+ .kn-support-message {max-width:94%}.kn-support-message-body p {font-size:14px}
+ .kn-support-compose {padding-inline:10px}.kn-support-compose button {padding-inline:12px;min-width:76px}
+ #modal:has(.kn-profile-edit){max-height:92dvh!important;overflow-y:auto!important;width:min(96vw,520px)!important}
+ .kn-edit-photo .avatar {width:63px;height:63px}
+ .kn-edit-identity {align-items:stretch}.kn-edit-identity .button {width:100%}
+ .kn-permissions-checklist {max-height:230px}
+}
+@media(max-width:380px){.kn-support-person {font-size:10px}.kn-profile-edit .button {min-height:44px}}
+@media(prefers-reduced-motion:reduce){.kn-switch-row input[type=checkbox],.kn-switch-row input[type=checkbox]::after {transition:none}}

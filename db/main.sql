@@ -123,7 +123,7 @@ CREATE TABLE IF NOT EXISTS notifications (
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id,created_at DESC);
 CREATE TABLE IF NOT EXISTS support_tickets (
  id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), category TEXT NOT NULL, subject TEXT NOT NULL,
- status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','waiting','resolved','closed')),
+ status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','waiting','resolved','closed')), assigned_to TEXT,
  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_support_status ON support_tickets(status,created_at DESC);
