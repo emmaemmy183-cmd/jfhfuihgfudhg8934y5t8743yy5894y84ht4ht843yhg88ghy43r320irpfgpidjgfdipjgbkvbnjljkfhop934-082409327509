@@ -1,0 +1,179 @@
+/* Kennely 2027.18 — distinct desktop and mobile layouts, photo-only posts. */
+:root{--kn-space:clamp(14px,2.5vw,28px);--kn-border:color-mix(in srgb,var(--line) 94%,transparent)}
+html{scroll-behavior:auto}#content{min-width:0}button{touch-action:manipulation}
+body[data-view=profile] .right-rail,body[data-view=messages] .right-rail,body[data-view=explore] .right-rail,body[data-view=settings] .right-rail{display:none!important}
+@media(min-width:761px){
+ body[data-view=profile] .content{width:min(100%,950px)!important}
+ body[data-view=explore] .content{width:min(100%,1050px)!important}
+ body[data-view=settings] .content{width:min(100%,1000px)!important}
+ body[data-view=messages] .content{width:min(100%,1150px)!important}
+ body[data-view=profile] .workarea,body[data-view=messages] .workarea,body[data-view=explore] .workarea,body[data-view=settings] .workarea{padding-inline:clamp(20px,3vw,55px)}
+ .kn-profile-hero{max-width:940px;margin:0 auto 15px;display:grid;grid-template-columns:230px minmax(0,1fr);grid-template-rows:auto auto auto;column-gap:35px;row-gap:10px;padding:22px 20px 30px}
+ .kn-profile-topline{grid-column:2;grid-row:1}
+ .kn-profile-overview{display:contents}
+ .kn-profile-photo{grid-column:1;grid-row:1 / span 3;align-self:center;justify-self:center}
+ .kn-profile-stats{grid-column:2;grid-row:2;margin:12px 0}
+ .kn-profile-bio{grid-column:2;grid-row:3}
+ .kn-profile-buttons{grid-column:2;grid-row:1;justify-content:flex-end;align-self:center;margin:0 4px 0 auto}
+ .kn-profile-topline h1{padding-right:190px}
+ .kn-profile-media-grid{max-width:940px;margin:0 auto}
+ .kn-post-detail{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(310px,.9fr);height:min(85dvh,740px);max-height:calc(100dvh - 45px)}
+ .kn-detail-media{min-height:0;min-width:0;display:grid;place-items:center;background:#08080d}
+ .kn-detail-media img{max-width:100%;max-height:100%;height:auto;width:auto;object-fit:contain;display:block}
+ .kn-detail-panel{display:flex;flex-direction:column;min-height:0;min-width:0;background:var(--surface)}
+ .kn-detail-scroll{flex:1;overflow-y:auto;overscroll-behavior:contain;min-height:0;padding:12px 19px}
+ .kn-detail-head{min-height:75px;display:flex;align-items:center;gap:10px;padding:16px 42px 14px 18px;border-bottom:1px solid var(--kn-border)}
+ .kn-detail-head small{font-size:11px;color:var(--muted)}
+ .kn-detail-footer{padding:14px 18px 18px;border-top:1px solid var(--kn-border)}
+ .kn-detail-caption{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.55;white-space:pre-wrap;padding-bottom:18px}
+ .kn-detail-caption>div{min-width:0;overflow-wrap:anywhere}
+ #modal:has(.kn-post-detail){width:min(94vw,1110px);max-width:1110px;max-height:min(89dvh,790px);overflow:hidden}
+ #modal:has(.kn-post-detail) .modal-shell{width:100%;max-height:none;height:auto;padding:0!important;overflow:hidden;border:0;box-shadow:none}
+ #modal:has(.kn-post-detail) #closeModal{top:12px;right:11px;z-index:9}
+ #modal:has(.comment-dialog){width:min(760px,92vw)!important;max-width:760px}
+ #modal:has(.comment-dialog) .modal-shell{min-height:min(680px,86dvh);height:min(75dvh,710px)!important}
+ .chat-layout{grid-template-columns:minmax(260px,330px) minmax(0,1fr)!important;min-height:620px!important;max-height:min(83dvh,850px)}
+ .chat-layout .thread-list{min-height:580px;max-height:none!important}
+ .chat-layout .thread-window{min-height:580px!important}
+ .chat-layout .thread-messages{max-height:none!important;min-height:0}
+}
+/* Public profile: clear hierarchy, counts alongside the portrait, no fake controls. */
+.kn-profile-hero{min-width:0;border-bottom:1px solid var(--line)}
+.kn-profile-topline{display:flex;align-items:center;gap:8px;min-width:0}
+.kn-profile-topline h1{font-size:clamp(20px,3vw,27px);letter-spacing:-.025em;overflow-wrap:anywhere;min-width:0;margin:0;font-weight:800;display:flex;align-items:center;gap:7px}
+.kn-profile-top-settings{border:0;background:none;color:var(--text);font-size:23px;padding:4px 10px}
+.kn-profile-photo{position:relative;min-width:0;width:max-content}
+.kn-profile-photo .avatar.big{width:clamp(115px,12vw,165px)!important;height:clamp(115px,12vw,165px)!important;border:3px solid var(--surface);outline:2px solid color-mix(in srgb,var(--accent) 48%,var(--line));}
+.kn-profile-photo .avatar-upload-plus{right:0;bottom:0}
+.kn-profile-stats{display:flex;justify-content:space-around;gap:12px;align-items:center;min-width:0}
+.kn-profile-stats>div,.kn-profile-stats>button{flex:1;min-width:0;display:grid;gap:5px;justify-items:center;text-align:center;border:0;background:none;color:var(--text);padding:7px 3px;white-space:nowrap}
+.kn-profile-stats strong{font-weight:800;font-size:clamp(17px,2vw,23px)}
+.kn-profile-stats span{font-size:clamp(11px,1.4vw,14px)}
+.kn-profile-bio{min-width:0;line-height:1.55;font-size:14px;overflow-wrap:anywhere}
+.kn-profile-bio>strong{font-size:15px}.kn-profile-bio p{margin:6px 0;white-space:pre-wrap}.kn-profile-bio small{color:var(--muted)}
+.kn-profile-buttons{display:flex;gap:9px;min-width:0;flex-wrap:wrap}
+.kn-profile-buttons .button{min-width:115px;min-height:39px;padding:10px 15px;border-radius:11px}
+.kn-profile-more{min-height:39px;min-width:44px}
+.kn-profile-grid-head{max-width:940px;margin:0 auto;display:flex;align-items:center;justify-content:center;gap:8px;min-height:49px;color:var(--text);font-size:12px;font-weight:800;letter-spacing:.12em}
+.kn-profile-grid-head span{font-size:24px;line-height:1}
+.kn-profile-media-grid{gap:3px!important;margin-top:0!important}
+.kn-profile-media-grid button{border-radius:0!important;aspect-ratio:1!important;min-width:0}
+.kn-profile-media-grid img{width:100%;height:100%;object-fit:cover;display:block;transition:filter .14s}
+.kn-profile-media-grid button:hover img{filter:brightness(.78)}
+.kn-return-link{display:block;margin:0 0 14px;padding:10px 2px;color:var(--accent);background:none;border:0;font-weight:700}
+/* Post viewer and comments */
+.kn-post-detail{background:var(--surface);color:var(--text);min-width:0}
+.kn-detail-panel{min-width:0}
+.kn-detail-head .avatar,.kn-detail-caption .avatar{flex-shrink:0}
+.kn-detail-actions{display:flex;align-items:center;gap:13px;margin:0 0 7px}
+.kn-detail-actions .icon-button{min-width:35px;min-height:37px}
+.kn-detail-actions .save{margin-left:auto}
+.kn-detail-footer>strong{font-size:13px}
+.kn-post-text-tile{padding:30px;display:grid;place-items:center;min-height:180px;font-size:21px;text-align:center;white-space:pre-wrap;background:linear-gradient(140deg,#241234,#44245b)}
+.kn-comment-composer{display:flex!important;align-items:flex-end!important;gap:9px!important;min-width:0;width:100%;padding:11px 0 0!important;background:transparent!important;border:0!important}
+.kn-comment-composer textarea{display:block;box-sizing:border-box;min-width:0;flex:1 1 0;width:100%;max-width:100%;height:auto;min-height:55px;max-height:144px;padding:14px 16px;line-height:1.5;font-size:15px;resize:vertical;background:var(--surface2);border:1px solid var(--line);color:var(--text);border-radius:16px;overflow-y:auto;white-space:pre-wrap;outline-offset:2px}
+.kn-comment-composer textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 16%,transparent)}
+.kn-comment-composer .button{width:auto!important;min-width:82px;min-height:48px;flex:0 0 auto;padding:10px 16px;border-radius:14px}
+.comment-dialog{width:100%;max-height:none!important;min-height:0!important}
+.comment-dialog h2{font-size:21px!important;margin:0 0 12px!important}
+.comment-dialog .comment-list{flex:1 1 auto;min-height:0;overflow:auto!important;scrollbar-width:thin}
+.comment-dialog .comment-main p{font-size:14px;line-height:1.5}
+.kn-comment-bottom{flex-shrink:0;background:var(--surface);padding-top:10px;border-top:1px solid var(--line)}
+.kn-comment-emoji-bar{display:flex;justify-content:space-between;gap:4px;overflow-x:auto;scrollbar-width:none;max-width:100%;padding:3px 0 8px}
+.kn-comment-emoji-bar button{background:transparent;border:0;border-radius:10px;padding:5px;flex:0 0 auto;font-size:clamp(20px,4.5vw,29px);min-width:38px;min-height:40px}
+.kn-comment-emoji-bar button:hover,.kn-comment-emoji-bar button:focus-visible{background:var(--surface2)}
+.kn-comment-handle{display:none}
+/* Chat: emoji badges belong BELOW the bubble, never inside the text. */
+.kn-bubble-row{display:flex;align-items:center!important;gap:7px!important;max-width:100%;position:relative;min-height:38px}
+.kn-bubble-row:has(.kn-message-reactions){margin-bottom:18px}
+.kn-bubble-row .kn-bubble-stack{display:flex;flex-direction:column;align-items:flex-start;min-width:0;max-width:min(80%,520px);position:relative}
+.kn-bubble-row.mine .kn-bubble-stack{align-items:flex-end;order:2}
+.kn-bubble-row.mine .react-trigger{order:1}
+.kn-bubble-row .bubble{max-width:100%!important;width:max-content;min-width:45px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5;padding:11px 15px}
+.kn-message-reactions{display:flex;gap:2px;align-items:center;justify-content:flex-start;position:absolute;top:calc(100% - 2px);left:11px;max-width:100%;z-index:1}
+.kn-bubble-row.mine .kn-message-reactions{left:auto;right:11px}
+.kn-reaction-chip{display:grid;place-items:center;min-width:27px;height:25px;font-size:16px;padding:0 5px;background:var(--surface);border:2px solid var(--bg);border-radius:999px;box-shadow:0 2px 7px #0003}
+.kn-reaction-chip.is-own{background:color-mix(in srgb,var(--accent) 19%,var(--surface))}
+.kn-bubble-row .react-trigger{opacity:0;transition:opacity .13s;border-radius:50%;width:32px;height:32px;font-size:18px;padding:0;border:1px solid transparent;flex:0 0 auto}
+.kn-bubble-row:hover .react-trigger,.kn-bubble-row:focus-within .react-trigger,.kn-bubble-row.reaction-actions-visible .react-trigger{opacity:.95}
+.kn-bubble-row .react-trigger:hover{background:var(--surface2);border-color:var(--line)}
+.bubble[data-bubble]{cursor:pointer;user-select:text}
+.thread-head{min-width:0}.thread-head .thread-person{flex:1;min-width:0}
+.thread-window{min-width:0;overflow:hidden}.thread-messages{scrollbar-width:thin;padding:20px!important}
+.thread-head .tiny-btn{font-size:11px}
+/* Settings: clear but not a direct visual clone. */
+body[data-view=settings] .setting-group{box-shadow:none}
+body[data-view=settings] .page-head h1{font-size:clamp(25px,3vw,34px)!important}
+@media(max-width:760px){
+ .workarea{padding:67px 0 calc(78px + env(safe-area-inset-bottom))!important;min-width:0}
+ .content{width:100%!important;min-width:0}
+ .page-head{padding-inline:17px;margin-block:14px 18px}
+ .kn-profile-hero{padding:6px 17px 17px}
+ .kn-profile-topline{display:flex;margin:6px 0 20px}
+ .kn-profile-topline h1{font-size:clamp(20px,5.5vw,26px)}
+ .kn-profile-top-settings{margin-left:auto}
+ .kn-profile-overview{display:grid;grid-template-columns:minmax(78px,105px) minmax(0,1fr);gap:12px;align-items:center}
+ .kn-profile-photo .avatar.big{width:clamp(80px,20vw,105px)!important;height:clamp(80px,20vw,105px)!important}
+ .kn-profile-stats{gap:2px}
+ .kn-profile-stats strong{font-size:17px}.kn-profile-stats span{font-size:11px}
+ .kn-profile-bio{margin:17px 0 15px}
+ .kn-profile-buttons{width:100%;gap:8px}
+ .kn-profile-buttons .button{flex:1 1 0;min-width:0;padding:9px 5px;font-size:13px}
+ .kn-profile-grid-head{height:47px;min-height:47px;border-top:1px solid var(--line)}
+ .kn-profile-media-grid{gap:2px!important}
+ .kn-post-detail{display:flex;flex-direction:column;width:100%;min-height:0;max-height:100%;overflow:auto}
+ .kn-detail-media{min-height:0;max-height:63dvh;flex-shrink:0;display:grid;place-items:center;background:#08080d}
+ .kn-detail-media img{max-height:63dvh;max-width:100%;width:auto;height:auto;object-fit:contain;display:block}
+ .kn-detail-panel{flex:1;min-height:0}
+ .kn-detail-head{display:flex;align-items:center;gap:9px;padding:13px 56px 13px 15px;border-bottom:1px solid var(--line)}
+ .kn-detail-head small{color:var(--muted);font-size:11px}
+ .kn-detail-scroll{padding:12px 16px;max-height:36dvh;overflow:auto}
+ .kn-detail-footer{padding:12px 16px 20px;border-top:1px solid var(--line)}
+ .kn-detail-caption{display:flex;gap:9px;line-height:1.6}
+ #modal:has(.kn-post-detail){position:fixed;inset:0;margin:0!important;width:100vw!important;max-width:none!important;height:100dvh!important;max-height:100dvh!important;border-radius:0!important;overflow:hidden!important}
+ #modal:has(.kn-post-detail) .modal-shell{width:100%;height:100dvh;max-height:100dvh!important;border-radius:0!important;padding:62px 0 max(15px,env(safe-area-inset-bottom))!important;overflow-y:auto!important;border:0!important}
+ #modal:has(.kn-post-detail) #closeModal{top:9px;right:12px}
+ /* Comments are an independently scrolling bottom sheet with a stable writing area. */
+ #modal:has(.comment-dialog){position:fixed!important;inset:auto 0 0 0!important;width:100%!important;max-width:100%!important;max-height:min(88dvh,900px)!important;margin:0!important;border-radius:25px 25px 0 0!important;overflow:hidden}
+ #modal:has(.comment-dialog) .modal-shell{padding:45px 16px max(14px,env(safe-area-inset-bottom))!important;min-height:0!important;height:min(82dvh,790px)!important;max-height:min(88dvh,900px)!important;overflow:hidden!important}
+ #modal:has(.comment-dialog) #modalBody{display:flex;min-height:0;flex:1}
+ .comment-dialog .kn-comment-handle{display:block;position:absolute;width:42px;height:4px;border-radius:99px;background:var(--muted);top:12px;left:calc(50% - 21px);opacity:.75}
+ .comment-dialog h2{margin:0 0 11px!important}
+ .comment-dialog .comment-list{padding:7px 1px;flex:1;min-height:0}
+ .comment-dialog .comment-item{padding:12px 0;gap:8px}
+ .kn-comment-emoji-bar button{font-size:25px}
+ .kn-comment-composer textarea{min-height:53px;max-height:120px;font-size:16px}
+ .kn-comment-composer .button{min-width:66px;padding:8px 11px;font-size:12px}
+ .chat-layout{border:0!important;border-radius:0!important;margin:0!important;width:100%;max-height:calc(100dvh - 155px);min-height:calc(100dvh - 155px)}
+ .chat-layout .thread-list{max-height:calc(100dvh - 180px)!important}
+ .chat-layout.thread-open .thread-window{display:flex!important;min-height:calc(100dvh - 155px)}
+ .chat-layout.thread-open .thread-list{display:none!important}
+ .chat-layout .thread-window{max-height:calc(100dvh - 155px);overflow:hidden}
+ .thread-messages{max-height:none!important;flex:1;min-height:0;overflow-y:auto!important;padding:15px 12px 22px!important}
+ .kn-bubble-row .kn-bubble-stack{max-width:min(85%,380px)}
+ .kn-bubble-row .react-trigger{width:30px;opacity:0}
+ .kn-bubble-row.reaction-actions-visible .react-trigger{opacity:1}
+ .thread-head{padding:12px;gap:5px}
+ .thread-head .tiny-btn{font-size:10px;padding:6px}
+ body[data-view=settings] .settings-grid{display:block;padding:0 15px}
+ body[data-view=settings] .setting-group{border:0;border-radius:0;padding:22px 6px;border-bottom:6px solid var(--bg);margin:0 0 4px;background:transparent!important}
+ body[data-view=settings] .setting-group h3{font-size:17px}
+ body[data-view=settings] .setting-priority{background:var(--surface)!important;padding:20px 16px;border-radius:17px;margin:0 0 13px}
+ body[data-view=settings] .setting-group .settings-link{min-height:51px}
+ .post{border-radius:0!important;border-inline:0!important}
+ .kn-feed-list{padding:0}
+}
+@media(max-width:380px){.kn-profile-overview{grid-template-columns:75px 1fr;gap:7px}.kn-profile-photo .avatar.big{width:75px!important;height:75px!important}.kn-profile-stats strong{font-size:15px}.kn-profile-stats span{font-size:10px}.kn-comment-emoji-bar button{min-width:33px;font-size:23px}.kn-comment-composer .button{min-width:63px}}
+@media(prefers-reduced-motion:reduce){.kn-profile-media-grid img,.kn-bubble-row .react-trigger{transition:none}}
+/* Open mobile conversations are full-height screens: the input must never sit behind the bottom navigation. */
+@media(max-width:760px){
+ body:has(.chat-layout.thread-open) .mobile-top,
+ body:has(.chat-layout.thread-open) .mobile-nav{display:none!important}
+ body:has(.chat-layout.thread-open) .workarea{padding:0!important;min-height:100dvh!important}
+ body:has(.chat-layout.thread-open) .page-head{display:none!important}
+ body:has(.chat-layout.thread-open) .chat-layout{height:100dvh!important;min-height:100dvh!important;max-height:100dvh!important}
+ body:has(.chat-layout.thread-open) .thread-window{min-height:0!important;height:100dvh!important;max-height:100dvh!important;display:flex!important;flex-direction:column}
+ body:has(.chat-layout.thread-open) .thread-head{min-height:69px;flex-shrink:0}
+ body:has(.chat-layout.thread-open) #sendMessageForm{flex-shrink:0;padding:12px 13px max(13px,env(safe-area-inset-bottom));background:var(--surface);min-height:70px}
+ body:has(.chat-layout.thread-open) .thread-messages{flex:1 1 0;min-height:0;overflow-y:auto}
+}

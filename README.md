@@ -1,3 +1,11 @@
+# Kennely 2027.18 – responsive Foto-Community
+
+**Aktuelle Update-Anleitung: [`UPDATE_2027_18.md`](UPDATE_2027_18.md)**
+
+Die Oberfläche bietet getrennte Ansichten für Handy und Desktop, Foto-Beiträge mit vollständiger Detailansicht, Kommentar-Dialoge mit sichtbarem mehrzeiligen Textfeld und Chat-Emoji-Reaktionen als kleine Badges unter der Nachricht. Bei erneutem Doppeltippen bzw. Doppelklicken wird die eigene Herz-Reaktion wieder entfernt. Das Backend bleibt bei Netlify Functions und den bisherigen zwei Turso-Datenbanken.
+
+Hinweis: Die Funktionen und die rechtlichen Einschränkungen aus den älteren Versionshinweisen bleiben gültig. Keine Reels und keine Videos.
+
 # Kennely 2027.17 – Photo-first Social
 
 **Aktuelle Anleitung:** [UPDATE_2027_17.md](UPDATE_2027_17.md)
